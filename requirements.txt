@@ -1,0 +1,5 @@
+# Python dependencies for riftkit
+# Install with: pip3 install -r requirements.txt
+
+openai-whisper>=20231117
+PyYAML>=6.0

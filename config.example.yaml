@@ -1,0 +1,20 @@
+# riftkit Configuration Example
+# Copy to config.yaml and customize for your setup
+
+paths:
+  uvr: "/path/to/ultimatevocalremovergui"
+  reaper_projects: "~/music/projects"
+  templates: "~/.config/riftkit/templates"
+  
+uvr:
+  default_model: "MDX23C"
+  output_format: "wav"
+  
+whisper:
+  model: "medium"  # small, medium, large
+  language: "en"
+  
+reaper:
+  default_tempo: 120
+  time_signature: "4/4"
+  auto_open: true

@@ -1,0 +1,106 @@
+# riftkit .gitignore
+# Keep the repo lean - only code, docs, and templates
+
+# Audio Files (NEVER commit these - they're huge)
+*.mp3
+*.wav
+*.flac
+*.ogg
+*.m4a
+*.aac
+*.wma
+*.aiff
+*.aif
+
+# REAPER Files (Projects are generated, not source)
+*.RPP
+*.RPP-bak
+*.reapeaks
+*.reapindex
+
+# Exception: Keep templates (these are source)
+!templates/*.RPP-template
+!templates/*.RTrackTemplate
+
+# Generated/Working Directories
+stems/
+separated/
+projects/
+output/
+temp/
+tmp/
+cache/
+
+# UVR Generated Files
+ultimatevocalremovergui/
+uvr_output/
+models/
+
+# Whisper Generated Files
+*.json
+whisper_cache/
+
+# Exception: Keep example/test JSON files
+!examples/**/*.json
+!tests/**/*.json
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+venv/
+env/
+ENV/
+.venv/
+build/
+dist/
+*.egg-info/
+.pytest_cache/
+.coverage
+
+# IDEs and Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS Generated Files
+.DS_Store
+._*
+*~
+.directory
+Thumbs.db
+Desktop.ini
+
+# Logs and Databases
+*.log
+*.sql
+*.sqlite
+*.db
+
+# Configuration (Personal settings)
+config.local.yaml
+config.override.yaml
+.env
+.env.local
+
+# Exception: Keep example config
+!config.example.yaml
+
+# Backup Files
+*.bak
+*.backup
+*.old
+
+# Downloaded Models
+*.pth
+*.ckpt
+*.pt
+whisper-*.pt
+
+# Test Output
+test_output/
+test_projects/
+test_stems/
