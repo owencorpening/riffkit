@@ -23,12 +23,16 @@ This component acts as a **workflow wrapper** around powerful external AI models
 
 | Step | Action | Required Tool/Dependency | Output |
 | :--- | :--- | :--- | :--- |
-| **Step 1: Stemming** | Run your audio file through a separation model. | **UVR (Ultimate Vocal Remover)**, Demucs, or Spleeter | 4-6 separate WAV files (e.g., `bass.wav`, `drums.wav`, etc.). |
+| **Step 1: Stemming** | Run your audio file through Demucs. | **Demucs** (`pip install demucs`) | 4 WAV files: `vocals.wav`, `drums.wav`, `bass.wav`, `other.wav` |
 | **Step 2: Project Creation** | Use the custom template and/or script. | **`riffkit/stem-separation/stem_template.RPP`** | A REAPER project with all stems aligned and grouped. |
 
-#### External Dependencies: UVR / AI Models
+#### External Dependencies: Demucs
 
-You **must** have a working installation of a modern stem separation tool (like **Ultimate Vocal Remover (UVR)** or the models it wraps) accessible from your system to run the core stemming step.
+You **must** have Demucs installed to run the core stemming step:
+
+```bash
+pip install demucs
+```
 
 * *Note: This repository does not host the stem separation code; it only provides the post-processing and REAPER integration steps.*
 
@@ -36,28 +40,33 @@ You **must** have a working installation of a modern stem separation tool (like 
 
 ### 🚀 Usage Instructions
 
-#### Step 1: Create the Stems
+#### Option A: Automated (recommended)
 
-1.  Take your song's master audio file and run it through **UVR** or your configured AI separation tool.
-2.  Ensure the separated files (stems) are placed into a new, dedicated project folder (e.g., `/MyProject/Stems/`).
+Run `riftkit.py` from the repo root — it separates the stems and drops the template next to them:
 
-#### Step 2: Load the REAPER Template
+```bash
+./riftkit.py song.mp3 --output ~/music/projects
+```
 
-1.  Copy the **`stem_template.RPP`** file from this directory into your new project folder.
-2.  Open the template file in REAPER.
-3.  The template contains pre-labeled and pre-routed tracks (Bass, Drums, Guitar, etc.).
+Then open the generated `stem_template.RPP` in REAPER and skip to Step 3 below.
 
-#### Step 3: Insert and Align Stems
+#### Option B: Manual
 
-1.  In REAPER, use **File** $\rightarrow$ **Insert media file...**
-2.  Select all the separated stems from your `/Stems/` folder.
-3.  **Crucially:** Drag and drop the stems onto their corresponding, pre-labeled tracks in the template.
+1.  Run `demucs song.mp3` directly. Stems land in `separated/htdemucs/song/`.
+2.  Copy **`stem_template.RPP`** from this directory into your project folder.
+3.  Open the template in REAPER.
 
-You now have a fully functional practice project. You can mute the Guitar track to play along or lower the volume on the Bass track for **Joey** to practice his part.
+#### Step 3: Auto-import Stems with the Lua Script
+
+1.  In REAPER: **Actions** → **Show Action List** → **Load ReaScript** → select `import_stems.lua`.
+2.  Run the script and pick any one stem file when prompted.
+3.  The script scans the folder and places each stem on its matching track (Vocals, Drums, Bass, Other) automatically.
+
+You now have a fully functional practice project. Mute your own instrument track to play along, or lower the Bass track for **Joey** to practice his part.
 
 ---
+
 ### 🛠️ Next Steps & Future Development
 
-* **Automated Import Script:** Create a Lua script that automatically detects and aligns common stem names, eliminating the manual drag-and-drop in Step 3.
 * **Batch Processing:** Developing tools to process an entire setlist of songs at once.
-* **Model Configuration:** Documenting settings that yield the best results for separation models.
+* **Model Configuration:** Documenting settings that yield the best results for Demucs models (e.g. `htdemucs_ft` for fine-tuned separation).

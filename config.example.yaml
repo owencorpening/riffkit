@@ -2,12 +2,11 @@
 # Copy to config.yaml and customize for your setup
 
 paths:
-  uvr: "/path/to/ultimatevocalremovergui"
   reaper_projects: "~/music/projects"
   templates: "~/.config/riftkit/templates"
-  
-uvr:
-  default_model: "MDX23C"
+
+demucs:
+  model: "htdemucs"  # htdemucs (4-stem), htdemucs_ft (fine-tuned), htdemucs_6s (6-stem)
   output_format: "wav"
   
 whisper:
