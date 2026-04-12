@@ -25,7 +25,7 @@ This component is a **two-step workflow** that requires one external dependency:
 | Step | Action | Required Tool/Dependency | Output |
 | :--- | :--- | :--- | :--- |
 | **Step 1: Transcription** | Run your audio file through the AI model. | **Whisper** (or a similar, compatible transcription tool) | A **JSON file** containing time-coded lyrics. |
-| **Step 2: Import** | Run the custom script inside REAPER. | **`riftkit/lyrics-sync/insert_lyrics.lua`** | Lyrics inserted as timed items on a REAPER track. |
+| **Step 2: Import** | Run the custom script inside REAPER. | **`riftkit/lyrics-sync/InsertLyrics.lua`** (Whisper JSON) or **`AddLyrics.lua`** (plain text) | Lyrics inserted as timed items on a REAPER track. |
 
 #### External Dependency: Whisper
 
@@ -45,18 +45,26 @@ You must have a working installation of **Whisper** (or a compatible tool that o
 
 #### Step 2: Run the REAPER Script
 
-1.  Open or create your new REAPER project and import the original audio file onto a track.
-2.  Create a **new, empty track** directly above the audio track. This is where the lyrics will be placed.
-3.  In REAPER, go to **Action** $\rightarrow$ **Show Action List...**
-4.  Load the custom script: `riftkit/lyrics-sync/insert_lyrics.lua`.
-5.  Execute the script.
-6.  The script will automatically search the project directory for a compatible JSON file and **insert the lyrics** onto the empty track as synchronized media items.
+Two scripts are available depending on your source material:
+
+| Script | Use when… |
+| :--- | :--- |
+| **`InsertLyrics.lua`** | You have a Whisper JSON file with `offsets.from` / `offsets.to` timestamps. |
+| **`AddLyrics.lua`** | You have a plain `.txt` file; the script auto-aligns lines to peaks or silences in the Vocals track. |
+
+For either script:
+
+1.  Open or create your REAPER project and ensure a track named **Lyrics** exists.
+2.  In REAPER, go to **Actions** → **Show Action List** → **Load ReaScript**.
+3.  Select the appropriate script and run it. A file picker will prompt for your JSON or `.txt` file.
+4.  Lyrics are inserted as timed media items on the Lyrics track.
 
 #### Troubleshooting
 
-* If the lyrics don't appear, check that the JSON file is correctly named and located in the same folder as the `.RPP` project file.
-* Ensure the track you are importing to is empty.
-* Check the REAPER Console for error messages related to the Lua script.
+* If the lyrics don't appear, verify a track named exactly **Lyrics** exists in the project.
+* For `InsertLyrics.lua`, confirm the JSON contains a `transcription` array with `offsets.from` / `offsets.to` keys.
+* For `AddLyrics.lua`, ensure a track named **Vocals** exists with audio — the script uses it for timing detection.
+* Check the REAPER Console for error messages from the script.
 
 ---
 ### 🛠️ Next Steps & Future Development

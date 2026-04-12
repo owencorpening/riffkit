@@ -40,7 +40,8 @@ These scripts are focused on preparing and executing material for live use, leve
 
 ---
 
-### 🛠️ Next Steps & Future Development
+### 🛠️ Notes & Future Development
 
-* **Remote Control Configuration Guide:** A separate document detailing the necessary settings for setting up a mobile device (like a smartphone) as a **Smart MIDI Remote** for performance control.
-* **OSC/MIDI Template:** Inclusion of a universal controller template file for popular OSC applications to immediately work with the **`riffkit`** scripts.
+* **Remote Control Setup:** To use `smart_midi_remote.lua` with a smartphone/tablet, enable your MIDI-over-network or OSC-to-MIDI app as a MIDI input device in **Options → Preferences → MIDI Devices**.  Edit the `CC_MAP` table at the top of the script to match your controller layout.
+* **Lighting Hardware:** `stage_lighting_sync.lua` sends MIDI to REAPER's virtual keyboard input.  For hardware output, create a MIDI track set to monitor input and route its output to your lighting device.
+* **OSC/MIDI Template:** A universal controller template for popular OSC apps (TouchOSC, MIDI Designer) is a planned future addition.
