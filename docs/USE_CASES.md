@@ -15,7 +15,7 @@ A small church band that receives a short set of songs ahead of time and needs t
 ### Outputs
 
 * Separated stems for each song
-* A REAPER project ready for practice or playback
+* One REAPER project per song, typically with up to about five parts to manage
 * Lyrics for rehearsal or a large-screen display
 
 ### What riffkit does
@@ -23,7 +23,7 @@ A small church band that receives a short set of songs ahead of time and needs t
 * Separates the songs into stems
 * Lets each player mute their own part and learn the rest
 * Imports or displays lyrics
-* Keeps the result organized in REAPER
+* Keeps each song organized in its own REAPER project
 
 ### Relevant files
 
@@ -47,7 +47,7 @@ A single musician who wants to practice one part of a song without losing the co
 ### Outputs
 
 * Stem-separated practice audio
-* A REAPER project with the right track layout
+* A REAPER project with the right track layout, one project per song
 
 ### What riffkit does
 

@@ -27,6 +27,7 @@ One concrete example:
 
 * A church band plays twice a week.
 * They receive 4 MP3s about 3 days before the service.
+* Each song becomes its own REAPER project, usually with up to about five parts to manage.
 * Each band member needs to learn their own part well enough to play the set.
 * The band may also want lyrics on a large TV during rehearsal or performance.
 
@@ -34,13 +35,13 @@ In that workflow, `riffkit` helps by:
 
 * separating the song into stems so each player can mute their own part and learn the others
 * generating or syncing lyrics for a shared display
-* packaging the result into a REAPER project that is ready for practice or playback
+* building one REAPER project per song that is ready for practice or playback
 
 ### ⚙️ How It Works (The Core Components)
 
 `riffkit` is intentionally modular. Grab the pieces you need, adapt them, or ignore the rest.
 
-* **Audio Stemming:** Workflows for isolating individual **stems** (guitar, bass, drums, vocals) from a single mix using tools like **UVR (Ultimate Vocal Remover)**, instantly creating customized backing tracks.
+* **Audio Stemming:** Workflows for isolating individual **stems** (guitar, bass, drums, vocals) from a single mix using tools like **UVR (Ultimate Vocal Remover)**, creating customized backing tracks after processing time rather than instantly.
 * **Lyrics & Sync:** Leverages **AI transcription** (Whisper) to generate synchronized lyrics and even **chord suggestions** from any audio file, which are then imported directly into the REAPER timeline via **Lua Scripts**.
 * **REAPER Scripts:** A growing collection of Lua scripts that automate repetitive tasks, turning the DAW into a powerful, custom-fit environment for your entire creative process.
 
