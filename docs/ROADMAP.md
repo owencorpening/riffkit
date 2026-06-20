@@ -20,6 +20,7 @@ See [docs/USE_CASES.md](docs/USE_CASES.md) for the broader set of current scenar
 * Make stem separation and project setup reliable and predictable.
 * Make part-learning easy by muting individual stems.
 * Make lyric import and lyric display straightforward.
+* Make concert splitting a normal first step when the source file contains multiple songs.
 * Keep the REAPER scripts organized and easy to run.
 * Avoid adding features that do not help with actual music workflows.
 * Build a real fixture-based test suite with sample audio, lyric samples, and expected output data.

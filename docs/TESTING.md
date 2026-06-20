@@ -94,6 +94,7 @@ The first useful test fixtures should probably be:
 2. One matching lyrics text file
 3. One Whisper-style JSON transcription sample
 4. One REAPER template file stub for copy/placement tests
+5. One concert-style clip with a silence gap for split testing
 
 ## Notes on REAPER
 

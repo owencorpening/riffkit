@@ -62,7 +62,33 @@ A single musician who wants to practice one part of a song without losing the co
 * `stem-separation/import_stems.lua`
 * `scripts/reaper/quick_master_bus_toggle.lua`
 
-## 3. Live Performance With Lyrics
+## 3. Concert Ingestion
+
+### Who it is for
+
+A band, church team, or engineer who has a long concert recording and needs to split it into individual songs before doing anything else.
+
+### Inputs
+
+* One long MP3 or WAV recording
+* A rough silence pattern between songs
+
+### Outputs
+
+* One file per song
+* A segments manifest with timing information
+
+### What riffkit does
+
+* Detects long silence gaps
+* Splits the recording into song-sized files
+* Keeps the output ready for the normal stem / lyric / REAPER workflow
+
+### Relevant files
+
+* `riftkit.py`
+
+## 4. Live Performance With Lyrics
 
 ### Who it is for
 

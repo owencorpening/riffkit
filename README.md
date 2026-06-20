@@ -37,13 +37,26 @@ In that workflow, `riffkit` helps by:
 * generating or syncing lyrics for a shared display
 * building one REAPER project per song that is ready for practice or playback
 
+### 📌 Example Use Case: Concert Ingestion
+
+Sometimes the starting point is a full concert recording instead of clean song files.
+
+In that workflow:
+
+* a long MP3 or WAV contains multiple songs back-to-back
+* `riffkit` splits the recording into individual song files first
+* each resulting song can then flow through the normal stem / lyrics / REAPER project pipeline
+
 ### ⚙️ How It Works (The Core Components)
 
 `riffkit` is intentionally modular. Grab the pieces you need, adapt them, or ignore the rest.
 
 * **Audio Stemming:** Workflows for isolating individual **stems** (guitar, bass, drums, vocals) from a single mix using tools like **UVR (Ultimate Vocal Remover)**, creating customized backing tracks after processing time rather than instantly.
 * **Lyrics & Sync:** Leverages **AI transcription** (Whisper) to generate synchronized lyrics and even **chord suggestions** from any audio file, which are then imported directly into the REAPER timeline via **Lua Scripts**.
+* **Concert Splitting:** Breaks long multi-song recordings into individual song files before the normal workflow runs, using silence gaps as a first-pass boundary signal.
 * **REAPER Scripts:** A growing collection of Lua scripts that automate repetitive tasks, turning the DAW into a powerful, custom-fit environment for your entire creative process.
+
+*Note: concert splitting relies on `ffmpeg` and `ffprobe` being available on your PATH.*
 
 ### 🤝 Philosophy: Use It or Lose It
 
@@ -58,6 +71,7 @@ In that workflow, `riffkit` helps by:
 Near-term focus:
 
 * **Church band workflow:** take a handful of delivered MP3s, split stems, sync lyrics, and package the songs for practice and service playback.
+* **Concert ingestion:** split a long live recording into song-sized files before running the normal workflow.
 * **Part learning:** make it easy for each player to hear the rest of the band while muting their own part.
 * **Lyric display:** support large-screen lyric viewing for rehearsal or performance.
 * **Reliable packaging:** keep the output predictable so a project can be handed off and reused without a lot of manual cleanup.

@@ -1,3 +1,4 @@
+import json
 import shutil
 import subprocess
 from pathlib import Path
@@ -95,6 +96,60 @@ def test_copy_template_raises_when_template_missing(tmp_path):
     with patch.object(riftkit, "TEMPLATE_RPP", missing):
         with pytest.raises(FileNotFoundError, match="Template not found"):
             riftkit.copy_template(stems_dir)
+
+
+# ---------------------------------------------------------------------------
+# concert splitting
+# ---------------------------------------------------------------------------
+
+def test_build_song_segments_from_silences():
+    segments = riftkit.build_song_segments(
+        300.0,
+        [(55.0, 70.0), (150.0, 168.0), (240.0, 252.0)],
+    )
+
+    assert segments == [
+        (0.0, 55.0),
+        (70.0, 150.0),
+        (168.0, 240.0),
+        (252.0, 300.0),
+    ]
+
+
+def test_main_split_concert_invokes_splitter(tmp_path):
+    audio = tmp_path / "concert.mp3"
+    audio.touch()
+
+    out_dir = tmp_path / "out"
+
+    with patch("sys.argv", ["riftkit.py", str(audio), "--output", str(out_dir), "--split-concert"]), \
+         patch.object(riftkit, "split_concert_into_songs") as mock_split:
+        riftkit.main()
+
+    mock_split.assert_called_once()
+    called_audio, called_output = mock_split.call_args.args[:2]
+    assert called_audio == audio.resolve()
+    assert called_output == out_dir.resolve()
+
+
+def test_split_concert_into_songs_writes_manifest(tmp_path):
+    audio = tmp_path / "concert.mp3"
+    audio.touch()
+    out_dir = tmp_path / "out"
+
+    with patch.object(riftkit, "probe_duration", return_value=300.0), \
+         patch.object(riftkit, "detect_silence_intervals", return_value=[(55.0, 70.0), (150.0, 168.0)]), \
+         patch.object(riftkit, "export_segment") as mock_export:
+        split_dir = riftkit.split_concert_into_songs(audio, out_dir)
+
+    assert split_dir == out_dir / "concert_songs"
+    manifest = json.loads((split_dir / "segments.json").read_text())
+    assert manifest == [
+        {"index": 1, "file": "song_01.mp3", "start_seconds": 0.0, "end_seconds": 55.0},
+        {"index": 2, "file": "song_02.mp3", "start_seconds": 70.0, "end_seconds": 150.0},
+        {"index": 3, "file": "song_03.mp3", "start_seconds": 168.0, "end_seconds": 300.0},
+    ]
+    assert mock_export.call_count == 3
 
 
 # ---------------------------------------------------------------------------

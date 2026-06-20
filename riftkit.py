@@ -6,6 +6,7 @@ Usage:
     ./riftkit.py <song.mp3>
     ./riftkit.py <song.mp3> --output ~/music/projects
     ./riftkit.py <song.mp3> --no-lyrics
+    ./riftkit.py <concert.mp3> --split-concert
 
 Steps:
     1. Separate stems with Demucs (vocals, drums, bass, other)
@@ -24,11 +25,23 @@ import sys
 import argparse
 import subprocess
 import shutil
+import json
+import re
 from pathlib import Path
 
 
 TEMPLATE_RPP = Path(__file__).parent / "stem-separation" / "stem_template.RPP"
 DEMUCS_MODEL = "htdemucs"  # 4-stem model: vocals, drums, bass, other
+
+SILENCE_START_RE = re.compile(r"silence_start:\s*([0-9.]+)")
+SILENCE_END_RE = re.compile(
+    r"silence_end:\s*([0-9.]+)\s*\|\s*silence_duration:\s*([0-9.]+)"
+)
+
+
+def require_tool(name: str) -> None:
+    if shutil.which(name) is None:
+        raise RuntimeError(f"{name} is required but was not found on PATH")
 
 
 def separate_stems(audio_file: Path, output_dir: Path) -> Path:
@@ -67,6 +80,174 @@ def copy_template(stems_dir: Path) -> Path:
     return dest
 
 
+def probe_duration(audio_file: Path) -> float:
+    """Return the duration of audio_file in seconds using ffprobe."""
+    require_tool("ffprobe")
+    result = subprocess.run(
+        [
+            "ffprobe",
+            "-v",
+            "error",
+            "-show_entries",
+            "format=duration",
+            "-of",
+            "default=noprint_wrappers=1:nokey=1",
+            str(audio_file),
+        ],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(f"ffprobe failed for {audio_file.name}: {result.stderr.strip()}")
+    try:
+        return float(result.stdout.strip())
+    except ValueError as exc:
+        raise RuntimeError(f"Could not read duration for {audio_file.name}") from exc
+
+
+def detect_silence_intervals(
+    audio_file: Path,
+    silence_threshold_db: float,
+    min_silence_seconds: float,
+) -> list[tuple[float, float]]:
+    """Return (start, end) pairs for detected silences."""
+    require_tool("ffmpeg")
+    result = subprocess.run(
+        [
+            "ffmpeg",
+            "-hide_banner",
+            "-nostats",
+            "-i",
+            str(audio_file),
+            "-af",
+            f"silencedetect=noise={silence_threshold_db}dB:d={min_silence_seconds}",
+            "-f",
+            "null",
+            "-",
+        ],
+        capture_output=True,
+        text=True,
+    )
+    stderr = result.stderr or ""
+    silences: list[tuple[float, float]] = []
+    current_start = None
+    for line in stderr.splitlines():
+        start_match = SILENCE_START_RE.search(line)
+        if start_match:
+            current_start = float(start_match.group(1))
+            continue
+
+        end_match = SILENCE_END_RE.search(line)
+        if end_match:
+            end = float(end_match.group(1))
+            if current_start is None:
+                duration = float(end_match.group(2))
+                current_start = end - duration
+            silences.append((current_start, end))
+            current_start = None
+
+    return silences
+
+
+def build_song_segments(
+    duration: float,
+    silence_intervals: list[tuple[float, float]],
+) -> list[tuple[float, float]]:
+    """Convert silence intervals into song segments."""
+    segments: list[tuple[float, float]] = []
+    cursor = 0.0
+
+    for silence_start, silence_end in silence_intervals:
+        if silence_start > cursor:
+            segments.append((cursor, silence_start))
+        cursor = max(cursor, silence_end)
+
+    if duration > cursor:
+        segments.append((cursor, duration))
+
+    return [(start, end) for start, end in segments if end - start > 1.0]
+
+
+def export_segment(
+    audio_file: Path,
+    dest_file: Path,
+    start: float,
+    end: float,
+) -> None:
+    """Export one segment using ffmpeg."""
+    require_tool("ffmpeg")
+    codec_args = []
+    suffix = dest_file.suffix.lower()
+    if suffix == ".mp3":
+        codec_args = ["-c:a", "libmp3lame", "-q:a", "2"]
+    elif suffix == ".wav":
+        codec_args = ["-c:a", "pcm_s16le"]
+
+    result = subprocess.run(
+        [
+            "ffmpeg",
+            "-hide_banner",
+            "-nostats",
+            "-y",
+            "-ss",
+            f"{start:.3f}",
+            "-to",
+            f"{end:.3f}",
+            "-i",
+            str(audio_file),
+            *codec_args,
+            str(dest_file),
+        ],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(f"ffmpeg failed while exporting {dest_file.name}: {result.stderr.strip()}")
+
+
+def split_concert_into_songs(
+    audio_file: Path,
+    output_dir: Path,
+    silence_threshold_db: float = -35.0,
+    min_silence_seconds: float = 8.0,
+) -> Path:
+    """Split a concert file into numbered song files using silence gaps."""
+    duration = probe_duration(audio_file)
+    silences = detect_silence_intervals(audio_file, silence_threshold_db, min_silence_seconds)
+    segments = build_song_segments(duration, silences)
+
+    if len(segments) < 2:
+        raise RuntimeError(
+            "Could not find enough silence gaps to split the concert into songs. "
+            "Try lowering the silence threshold or using a longer minimum silence."
+        )
+
+    split_dir = output_dir / f"{audio_file.stem}_songs"
+    split_dir.mkdir(parents=True, exist_ok=True)
+
+    manifest = []
+    output_suffix = audio_file.suffix.lower() if audio_file.suffix.lower() in {".mp3", ".wav"} else ".wav"
+
+    print(f"Splitting concert: {audio_file.name}")
+    print(f"  Output → {split_dir}")
+    for i, (start, end) in enumerate(segments, start=1):
+        song_name = f"song_{i:02d}{output_suffix}"
+        dest_file = split_dir / song_name
+        export_segment(audio_file, dest_file, start, end)
+        manifest.append(
+            {
+                "index": i,
+                "file": song_name,
+                "start_seconds": round(start, 3),
+                "end_seconds": round(end, 3),
+            }
+        )
+        print(f"  {song_name}  [{start:.1f}s → {end:.1f}s]")
+
+    (split_dir / "segments.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+    return split_dir
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Process an audio file into a practice-ready REAPER project"
@@ -77,6 +258,23 @@ def main():
     )
     parser.add_argument(
         "--no-lyrics", action="store_true", help="Skip lyrics transcription"
+    )
+    parser.add_argument(
+        "--split-concert",
+        action="store_true",
+        help="Split a long concert recording into separate song files before processing",
+    )
+    parser.add_argument(
+        "--silence-threshold-db",
+        type=float,
+        default=-35.0,
+        help="Silence threshold in dB for concert splitting (default: -35.0)",
+    )
+    parser.add_argument(
+        "--min-silence-seconds",
+        type=float,
+        default=8.0,
+        help="Minimum silence length in seconds for concert splitting (default: 8.0)",
     )
 
     args = parser.parse_args()
@@ -91,6 +289,15 @@ def main():
 
     print(f"\nProcessing: {audio_file.name}")
     print(f"Output:     {output_dir}\n")
+
+    if args.split_concert:
+        split_concert_into_songs(
+            audio_file,
+            output_dir,
+            silence_threshold_db=args.silence_threshold_db,
+            min_silence_seconds=args.min_silence_seconds,
+        )
+        return
 
     # Step 1: Stem separation
     stems_dir = separate_stems(audio_file, output_dir)
