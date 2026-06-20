@@ -62,6 +62,7 @@ Near-term focus:
 * **Reliable packaging:** keep the output predictable so a project can be handed off and reused without a lot of manual cleanup.
 
 For a longer view of where the project is headed, see [docs/ROADMAP.md](docs/ROADMAP.md).
+For the concrete scenarios currently in scope, see [docs/USE_CASES.md](docs/USE_CASES.md).
 
 ***
 

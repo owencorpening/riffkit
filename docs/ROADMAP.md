@@ -13,6 +13,8 @@ The clearest current use case is a church band:
 3. Lyrics may need to be shown on a large TV or monitor.
 4. The finished output needs to be reusable for rehearsal and service playback.
 
+See [docs/USE_CASES.md](docs/USE_CASES.md) for the broader set of current scenarios.
+
 ## Near-Term Goals
 
 * Make stem separation and project setup reliable and predictable.
