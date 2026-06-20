@@ -22,6 +22,7 @@ See [docs/USE_CASES.md](docs/USE_CASES.md) for the broader set of current scenar
 * Make lyric import and lyric display straightforward.
 * Keep the REAPER scripts organized and easy to run.
 * Avoid adding features that do not help with actual music workflows.
+* Build a real fixture-based test suite with sample audio, lyric samples, and expected output data.
 
 ## What This Is Not
 

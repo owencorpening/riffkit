@@ -64,6 +64,7 @@ Near-term focus:
 
 For a longer view of where the project is headed, see [docs/ROADMAP.md](docs/ROADMAP.md).
 For the concrete scenarios currently in scope, see [docs/USE_CASES.md](docs/USE_CASES.md).
+For the testing approach and fixture plan, see [docs/TESTING.md](docs/TESTING.md).
 
 ***
 
