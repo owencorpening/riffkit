@@ -1,4 +1,4 @@
-# reaper-scripts: Utility Toolkit for Composition & Performance
+# REAPER Lua Scripts for riffkit
 
 This directory holds the Lua scripts that power the high-level **Composition** and **Performance** modes within **`riffkit`**. These scripts focus on automating tedious, repetitive tasks to streamline your workflow and turn REAPER into a truly custom musical environment.
 
