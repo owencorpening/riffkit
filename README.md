@@ -19,6 +19,23 @@ This infrastructure is built to support a resilient creative cycle, ensuring you
 | **Composition** | Capture and arrange ideas the moment inspiration hits. | Streamlined project templates for scratch tracks, with easy tools for **lyric sync** and **version control**. |
 | **Performance** | Prepare the full media environment for live shows. | Centralized control over backing tracks, synchronized lyrics/chords on screen, and the potential to control external systems (like lighting or video). |
 
+### 📌 Example Use Case: Church Band
+
+`riffkit` is useful any time a group needs to turn songs into something people can actually rehearse and perform.
+
+One concrete example:
+
+* A church band plays twice a week.
+* They receive 4 MP3s about 3 days before the service.
+* Each band member needs to learn their own part well enough to play the set.
+* The band may also want lyrics on a large TV during rehearsal or performance.
+
+In that workflow, `riffkit` helps by:
+
+* separating the song into stems so each player can mute their own part and learn the others
+* generating or syncing lyrics for a shared display
+* packaging the result into a REAPER project that is ready for practice or playback
+
 ### ⚙️ How It Works (The Core Components)
 
 `riffkit` is intentionally modular. Grab the pieces you need, adapt them, or ignore the rest.
@@ -32,6 +49,19 @@ This infrastructure is built to support a resilient creative cycle, ensuring you
 * **Built for Me First:** Features are added only when I need them for my own creative projects.
 * **Share Without Obligation:** The code is **open source** for you to use or adapt. There are **no support promises** and no commercial roadmap.
 * **Modular Design:** Take the scripts you need; leave the rest. The components are designed to work independently.
+
+### 🧭 Public Direction
+
+`riffkit` is aimed at small, real-world music workflows where people need to learn and perform a short set of songs with limited prep time.
+
+Near-term focus:
+
+* **Church band workflow:** take a handful of delivered MP3s, split stems, sync lyrics, and package the songs for practice and service playback.
+* **Part learning:** make it easy for each player to hear the rest of the band while muting their own part.
+* **Lyric display:** support large-screen lyric viewing for rehearsal or performance.
+* **Reliable packaging:** keep the output predictable so a project can be handed off and reused without a lot of manual cleanup.
+
+For a longer view of where the project is headed, see [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ***
 
