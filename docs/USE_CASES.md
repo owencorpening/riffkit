@@ -72,11 +72,13 @@ A band, church team, or engineer who has a long concert recording and needs to s
 
 * One long MP3 or WAV recording
 * A rough silence pattern between songs
+* Optional sidecar text file with song titles in order
 
 ### Outputs
 
 * One file per song
 * A segments manifest with timing information
+* Optional song names pulled from the sidecar text file
 
 ### What riffkit does
 

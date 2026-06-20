@@ -116,6 +116,32 @@ def test_build_song_segments_from_silences():
     ]
 
 
+def test_parse_song_titles_from_sidecar(tmp_path):
+    song_list = tmp_path / "concert.txt"
+    song_list.write_text(
+        "Jimi Hendrix - Live\n"
+        "Date: September 03, 1970\n"
+        "\n"
+        "Songs:\n"
+        "Stone Free\n"
+        "Foxy Lady\n"
+        "1. Hey Baby\n"
+        "02) All Along The Watchtower\n",
+        encoding="utf-8",
+    )
+
+    assert riftkit.parse_song_titles(song_list) == [
+        "Stone Free",
+        "Foxy Lady",
+        "Hey Baby",
+        "All Along The Watchtower",
+    ]
+
+
+def test_sanitize_filename_replaces_bad_chars():
+    assert riftkit.sanitize_filename("A/B:C*D?E\"F<G>H|I") == "A_B_C_D_E_F_G_H_I"
+
+
 def test_main_split_concert_invokes_splitter(tmp_path):
     audio = tmp_path / "concert.mp3"
     audio.touch()
@@ -145,11 +171,28 @@ def test_split_concert_into_songs_writes_manifest(tmp_path):
     assert split_dir == out_dir / "concert_songs"
     manifest = json.loads((split_dir / "segments.json").read_text())
     assert manifest == [
-        {"index": 1, "file": "song_01.mp3", "start_seconds": 0.0, "end_seconds": 55.0},
-        {"index": 2, "file": "song_02.mp3", "start_seconds": 70.0, "end_seconds": 150.0},
-        {"index": 3, "file": "song_03.mp3", "start_seconds": 168.0, "end_seconds": 300.0},
+        {"index": 1, "file": "01 - song_01.mp3", "title": "song_01", "start_seconds": 0.0, "end_seconds": 55.0},
+        {"index": 2, "file": "02 - song_02.mp3", "title": "song_02", "start_seconds": 70.0, "end_seconds": 150.0},
+        {"index": 3, "file": "03 - song_03.mp3", "title": "song_03", "start_seconds": 168.0, "end_seconds": 300.0},
     ]
     assert mock_export.call_count == 3
+
+
+def test_split_concert_into_songs_uses_titles(tmp_path):
+    audio = tmp_path / "concert.mp3"
+    audio.touch()
+    out_dir = tmp_path / "out"
+    titles = ["Stone Free", "Foxy Lady", "Hey Baby"]
+
+    with patch.object(riftkit, "probe_duration", return_value=300.0), \
+         patch.object(riftkit, "detect_silence_intervals", return_value=[(55.0, 70.0), (150.0, 168.0)]), \
+         patch.object(riftkit, "export_segment"):
+        split_dir = riftkit.split_concert_into_songs(audio, out_dir, song_titles=titles)
+
+    manifest = json.loads((split_dir / "segments.json").read_text())
+    assert manifest[0]["file"] == "01 - Stone Free.mp3"
+    assert manifest[0]["title"] == "Stone Free"
+    assert manifest[2]["file"] == "03 - Hey Baby.mp3"
 
 
 # ---------------------------------------------------------------------------

@@ -45,6 +45,7 @@ In that workflow:
 
 * a long MP3 or WAV contains multiple songs back-to-back
 * `riffkit` splits the recording into individual song files first
+* a sidecar `.txt` file can provide the song titles in order
 * each resulting song can then flow through the normal stem / lyrics / REAPER project pipeline
 
 ### ⚙️ How It Works (The Core Components)

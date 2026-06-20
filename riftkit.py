@@ -44,6 +44,35 @@ def require_tool(name: str) -> None:
         raise RuntimeError(f"{name} is required but was not found on PATH")
 
 
+def sanitize_filename(name: str) -> str:
+    """Return a filesystem-safe filename fragment."""
+    cleaned = re.sub(r"[\\/:*?\"<>|]", "_", name).strip()
+    cleaned = re.sub(r"\s+", " ", cleaned)
+    return cleaned or "untitled"
+
+
+def parse_song_titles(song_list_file: Path) -> list[str]:
+    """Parse a sidecar text file that contains one song title per line."""
+    lines = song_list_file.read_text(encoding="utf-8").splitlines()
+    titles: list[str] = []
+    in_songs_section = False
+
+    for raw_line in lines:
+        line = raw_line.strip()
+        if not line:
+            continue
+        if line.lower() == "songs:":
+            in_songs_section = True
+            continue
+        if not in_songs_section:
+            continue
+        line = re.sub(r"^\d+[\).\-\:]?\s*", "", line)
+        if line:
+            titles.append(line)
+
+    return titles
+
+
 def separate_stems(audio_file: Path, output_dir: Path) -> Path:
     """Run Demucs on audio_file; return the folder containing the stem WAVs."""
     print(f"Separating stems: {audio_file.name}")
@@ -210,6 +239,7 @@ def split_concert_into_songs(
     output_dir: Path,
     silence_threshold_db: float = -35.0,
     min_silence_seconds: float = 8.0,
+    song_titles: list[str] | None = None,
 ) -> Path:
     """Split a concert file into numbered song files using silence gaps."""
     duration = probe_duration(audio_file)
@@ -227,17 +257,21 @@ def split_concert_into_songs(
 
     manifest = []
     output_suffix = audio_file.suffix.lower() if audio_file.suffix.lower() in {".mp3", ".wav"} else ".wav"
+    titles = song_titles or []
 
     print(f"Splitting concert: {audio_file.name}")
     print(f"  Output → {split_dir}")
     for i, (start, end) in enumerate(segments, start=1):
-        song_name = f"song_{i:02d}{output_suffix}"
+        title = titles[i - 1] if i - 1 < len(titles) else f"song_{i:02d}"
+        file_stem = f"{i:02d} - {sanitize_filename(title)}"
+        song_name = f"{file_stem}{output_suffix}"
         dest_file = split_dir / song_name
         export_segment(audio_file, dest_file, start, end)
         manifest.append(
             {
                 "index": i,
                 "file": song_name,
+                "title": title,
                 "start_seconds": round(start, 3),
                 "end_seconds": round(end, 3),
             }
@@ -276,6 +310,10 @@ def main():
         default=8.0,
         help="Minimum silence length in seconds for concert splitting (default: 8.0)",
     )
+    parser.add_argument(
+        "--song-list",
+        help="Sidecar text file with one song title per line, in order",
+    )
 
     args = parser.parse_args()
 
@@ -291,11 +329,16 @@ def main():
     print(f"Output:     {output_dir}\n")
 
     if args.split_concert:
+        song_list_file = Path(args.song_list).expanduser().resolve() if args.song_list else audio_file.with_suffix(".txt")
+        song_titles = parse_song_titles(song_list_file) if song_list_file.exists() else []
+        if song_titles:
+            print(f"Using song titles from: {song_list_file}")
         split_concert_into_songs(
             audio_file,
             output_dir,
             silence_threshold_db=args.silence_threshold_db,
             min_silence_seconds=args.min_silence_seconds,
+            song_titles=song_titles,
         )
         return
 
