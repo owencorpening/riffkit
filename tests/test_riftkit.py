@@ -12,6 +12,7 @@ import library_tools
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 STOCKHOLM_AUDIO = FIXTURES_DIR / "audio" / "stockholm_excerpt.mp3"
 STOCKHOLM_LYRICS = FIXTURES_DIR / "lyrics" / "stockholm_excerpt.txt"
+STOCKHOLM_LYRICS_WITH_CHATTER = FIXTURES_DIR / "lyrics" / "stockholm_excerpt_with_chatter.txt"
 STOCKHOLM_SPLIT_DIR = FIXTURES_DIR / "stockholm_split"
 
 
@@ -173,6 +174,38 @@ def test_parse_song_cues_from_timestamped_sidecar(tmp_path):
     ]
 
 
+def test_parse_song_cues_ignores_noncue_chatter(tmp_path):
+    song_list = tmp_path / "concert.txt"
+    song_list.write_text(
+        "Timestamps\n"
+        "0:00 Introduction\n"
+        "yay\n"
+        "1:10 Fire Part 1\n"
+        "purple haze\n"
+        "3:32 Drum Solo\n"
+        "\n"
+        "Artist: Jimi Hendrix\n"
+        "Location: Live in Sacramento\n",
+        encoding="utf-8",
+    )
+
+    assert riftkit.parse_song_cues(song_list) == [
+        (0.0, "Introduction"),
+        (70.0, "Fire Part 1"),
+        (212.0, "Drum Solo"),
+    ]
+
+
+def test_parse_song_cues_ignores_chatter_fixture():
+    assert riftkit.parse_song_cues(STOCKHOLM_LYRICS_WITH_CHATTER) == [
+        (0.0, "Introduction"),
+        (70.0, "Fire Part 1"),
+        (212.0, "Drum Solo"),
+        (422.0, "Fire Part 2"),
+        (536.0, "Spanish Castle Magic"),
+    ]
+
+
 def test_sanitize_filename_replaces_bad_chars():
     assert riftkit.sanitize_filename("A/B:C*D?E\"F<G>H|I") == "A_B_C_D_E_F_G_H_I"
 
@@ -248,6 +281,26 @@ def test_split_concert_into_songs_uses_timestamp_cues(tmp_path):
         {"index": 3, "file": "03 - Foxy Lady.mp3", "title": "Foxy Lady", "start_seconds": 150.0, "end_seconds": 300.0},
     ]
     assert mock_export.call_count == 3
+
+
+def test_build_song_segments_from_cues_dedupes_and_skips_out_of_range():
+    segments = riftkit.build_song_segments_from_cues(
+        120.0,
+        [
+            (55.0, "Stone Free"),
+            (5.0, "Intro"),
+            (55.0, "yay"),
+            (-10.0, "bad"),
+            (180.0, "too late"),
+            (100.0, "Foxy Lady"),
+        ],
+    )
+
+    assert segments == [
+        (5.0, 55.0, "Intro"),
+        (55.0, 100.0, "Stone Free"),
+        (100.0, 120.0, "Foxy Lady"),
+    ]
 
 
 def test_main_split_concert_prefers_timestamp_cues(tmp_path):
