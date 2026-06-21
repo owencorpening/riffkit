@@ -1,0 +1,100 @@
+[
+  {
+    "index": 1,
+    "file": "01 - Introduction.mp3",
+    "title": "Introduction",
+    "start_seconds": 0.0,
+    "end_seconds": 70.0
+  },
+  {
+    "index": 2,
+    "file": "02 - Fire Part 1.mp3",
+    "title": "Fire Part 1",
+    "start_seconds": 70.0,
+    "end_seconds": 212.0
+  },
+  {
+    "index": 3,
+    "file": "03 - Drum Solo.mp3",
+    "title": "Drum Solo",
+    "start_seconds": 212.0,
+    "end_seconds": 422.0
+  },
+  {
+    "index": 4,
+    "file": "04 - Fire Part 2.mp3",
+    "title": "Fire Part 2",
+    "start_seconds": 422.0,
+    "end_seconds": 536.0
+  },
+  {
+    "index": 5,
+    "file": "05 - Spanish Castle Magic.mp3",
+    "title": "Spanish Castle Magic",
+    "start_seconds": 536.0,
+    "end_seconds": 853.0
+  },
+  {
+    "index": 6,
+    "file": "06 - Machine Gun.mp3",
+    "title": "Machine Gun",
+    "start_seconds": 853.0,
+    "end_seconds": 1597.0
+  },
+  {
+    "index": 7,
+    "file": "07 - Lover Man.mp3",
+    "title": "Lover Man",
+    "start_seconds": 1597.0,
+    "end_seconds": 1787.0
+  },
+  {
+    "index": 8,
+    "file": "08 - Foxy Lady.mp3",
+    "title": "Foxy Lady",
+    "start_seconds": 1787.0,
+    "end_seconds": 1958.0
+  },
+  {
+    "index": 9,
+    "file": "09 - Hear My Train A Comin.mp3",
+    "title": "Hear My Train A Comin",
+    "start_seconds": 1958.0,
+    "end_seconds": 2445.0
+  },
+  {
+    "index": 10,
+    "file": "10 - Message to Love.mp3",
+    "title": "Message to Love",
+    "start_seconds": 2445.0,
+    "end_seconds": 2723.0
+  },
+  {
+    "index": 11,
+    "file": "11 - Red House.mp3",
+    "title": "Red House",
+    "start_seconds": 2723.0,
+    "end_seconds": 3177.0
+  },
+  {
+    "index": 12,
+    "file": "12 - Star Spangled Banner.mp3",
+    "title": "Star Spangled Banner",
+    "start_seconds": 3177.0,
+    "end_seconds": 3372.0
+  },
+  {
+    "index": 13,
+    "file": "13 - Purple Haze.mp3",
+    "title": "Purple Haze",
+    "start_seconds": 3372.0,
+    "end_seconds": 3670.0
+  },
+  {
+    "index": 14,
+    "file": "14 - Voodoo Child (Slight Return.mp3",
+    "title": "Voodoo Child (Slight Return",
+    "start_seconds": 3670.0,
+    "end_seconds": 5704.824
+  }
+]

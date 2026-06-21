@@ -4,6 +4,7 @@
 paths:
   reaper_projects: "~/music/projects"
   templates: "~/.config/riftkit/templates"
+  personal_library: "~/music/riffkit-library"
 
 demucs:
   model: "htdemucs"  # htdemucs (4-stem), htdemucs_ft (fine-tuned), htdemucs_6s (6-stem)

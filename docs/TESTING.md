@@ -34,15 +34,22 @@ Avoid:
 ```text
 tests/
   fixtures/
-    audio/
-      church-band-short.mp3
-      practice-drums-short.wav
-    lyrics/
-      church-band-lyrics.txt
-      church-band-whisper.json
-    reaper/
-      stem_template.RPP
-      lyrics_template_note.txt
+  audio/
+    church-band-short.mp3
+    practice-drums-short.wav
+    stockholm_excerpt.mp3
+  lyrics/
+    church-band-lyrics.txt
+    church-band-whisper.json
+    stockholm_excerpt.txt
+  stockholm_split/
+    segments.json
+    01 - Introduction.mp3
+    02 - Fire Part 1.mp3
+    03 - Drum Solo.mp3
+  reaper/
+    stem_template.RPP
+    lyrics_template_note.txt
 ```
 
 ## Test Layers

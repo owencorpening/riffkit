@@ -37,6 +37,15 @@ SILENCE_START_RE = re.compile(r"silence_start:\s*([0-9.]+)")
 SILENCE_END_RE = re.compile(
     r"silence_end:\s*([0-9.]+)\s*\|\s*silence_duration:\s*([0-9.]+)"
 )
+TIMESTAMP_LINE_RE = re.compile(
+    r"""^\s*\[?
+    (?P<timestamp>(?:\d+:)?\d{1,2}:\d{2}(?:[.,]\d{1,3})?)
+    \]?
+    (?:\s*[-–—:|]\s*|\s+)?
+    (?P<title>.*\S)?
+    \s*$""",
+    re.VERBOSE,
+)
 
 
 def require_tool(name: str) -> None:
@@ -55,22 +64,71 @@ def parse_song_titles(song_list_file: Path) -> list[str]:
     """Parse a sidecar text file that contains one song title per line."""
     lines = song_list_file.read_text(encoding="utf-8").splitlines()
     titles: list[str] = []
+    has_explicit_songs_section = any(line.strip().lower() == "songs:" for line in lines)
     in_songs_section = False
+    in_leading_title_block = not has_explicit_songs_section
 
     for raw_line in lines:
         line = raw_line.strip()
         if not line:
+            if not titles:
+                continue
+            in_leading_title_block = False
             continue
         if line.lower() == "songs:":
             in_songs_section = True
+            in_leading_title_block = False
             continue
-        if not in_songs_section:
+        if line.lower().startswith(("date:", "venue:", "setlist:", "concert:")):
+            in_leading_title_block = False
+            continue
+        if has_explicit_songs_section and not in_songs_section:
+            continue
+        if not has_explicit_songs_section and not in_leading_title_block:
             continue
         line = re.sub(r"^\d+[\).\-\:]?\s*", "", line)
         if line:
             titles.append(line)
 
     return titles
+
+
+def parse_timestamp(timestamp_text: str) -> float:
+    """Convert a timestamp like mm:ss, hh:mm:ss, or mm:ss.mmm to seconds."""
+    normalized = timestamp_text.strip().replace(",", ".")
+    parts = normalized.split(":")
+    if len(parts) not in (2, 3):
+        raise ValueError(f"Unsupported timestamp format: {timestamp_text!r}")
+
+    seconds = float(parts[-1])
+    minutes = int(parts[-2])
+    hours = int(parts[-3]) if len(parts) == 3 else 0
+    return hours * 3600 + minutes * 60 + seconds
+
+
+def parse_song_cues(song_list_file: Path) -> list[tuple[float, str]]:
+    """Parse a sidecar text file that contains timestamped song starts."""
+    lines = song_list_file.read_text(encoding="utf-8").splitlines()
+    cues: list[tuple[float, str]] = []
+
+    for raw_line in lines:
+        line = raw_line.strip()
+        if not line or line.lower() == "songs:":
+            continue
+
+        match = TIMESTAMP_LINE_RE.match(line)
+        if not match:
+            continue
+
+        timestamp = parse_timestamp(match.group("timestamp"))
+        title = (match.group("title") or "").strip()
+        title = re.sub(r"^[\s\-–—:|]+", "", title)
+        title = re.sub(r"^[\[(]+", "", title)
+        if not title:
+            title = f"song_{len(cues) + 1:02d}"
+        cues.append((timestamp, title))
+
+    return cues
 
 
 def separate_stems(audio_file: Path, output_dir: Path) -> Path:
@@ -197,6 +255,30 @@ def build_song_segments(
     return [(start, end) for start, end in segments if end - start > 1.0]
 
 
+def build_song_segments_from_cues(
+    duration: float,
+    song_cues: list[tuple[float, str]],
+) -> list[tuple[float, float, str]]:
+    """Convert timestamped song cues into (start, end, title) segments."""
+    seen_starts: set[float] = set()
+    cues: list[tuple[float, str]] = []
+    for start, title in sorted(song_cues, key=lambda item: item[0]):
+        if start < 0 or start > duration:
+            continue
+        if start in seen_starts:
+            continue
+        seen_starts.add(start)
+        cues.append((start, title))
+
+    segments: list[tuple[float, float, str]] = []
+    for i, (start, title) in enumerate(cues):
+        end = cues[i + 1][0] if i + 1 < len(cues) else duration
+        if end - start > 1.0:
+            segments.append((start, end, title))
+
+    return segments
+
+
 def export_segment(
     audio_file: Path,
     dest_file: Path,
@@ -239,14 +321,26 @@ def split_concert_into_songs(
     output_dir: Path,
     silence_threshold_db: float = -35.0,
     min_silence_seconds: float = 8.0,
+    song_cues: list[tuple[float, str]] | None = None,
     song_titles: list[str] | None = None,
 ) -> Path:
     """Split a concert file into numbered song files using silence gaps."""
     duration = probe_duration(audio_file)
-    silences = detect_silence_intervals(audio_file, silence_threshold_db, min_silence_seconds)
-    segments = build_song_segments(duration, silences)
+    cue_segments = build_song_segments_from_cues(duration, song_cues or [])
+    if cue_segments:
+        segments = cue_segments
+        use_cues = True
+    else:
+        silences = detect_silence_intervals(audio_file, silence_threshold_db, min_silence_seconds)
+        segments = build_song_segments(duration, silences)
+        use_cues = False
 
-    if len(segments) < 2:
+    if use_cues:
+        if len(segments) < 1:
+            raise RuntimeError(
+                "Could not find any valid timestamp cues in the sidecar text file."
+            )
+    elif len(segments) < 2:
         raise RuntimeError(
             "Could not find enough silence gaps to split the concert into songs. "
             "Try lowering the silence threshold or using a longer minimum silence."
@@ -261,8 +355,12 @@ def split_concert_into_songs(
 
     print(f"Splitting concert: {audio_file.name}")
     print(f"  Output → {split_dir}")
-    for i, (start, end) in enumerate(segments, start=1):
-        title = titles[i - 1] if i - 1 < len(titles) else f"song_{i:02d}"
+    for i, segment in enumerate(segments, start=1):
+        if use_cues:
+            start, end, title = segment
+        else:
+            start, end = segment
+            title = titles[i - 1] if i - 1 < len(titles) else f"song_{i:02d}"
         file_stem = f"{i:02d} - {sanitize_filename(title)}"
         song_name = f"{file_stem}{output_suffix}"
         dest_file = split_dir / song_name
@@ -330,14 +428,18 @@ def main():
 
     if args.split_concert:
         song_list_file = Path(args.song_list).expanduser().resolve() if args.song_list else audio_file.with_suffix(".txt")
-        song_titles = parse_song_titles(song_list_file) if song_list_file.exists() else []
-        if song_titles:
+        song_cues = parse_song_cues(song_list_file) if song_list_file.exists() else []
+        song_titles = parse_song_titles(song_list_file) if song_list_file.exists() and not song_cues else []
+        if song_cues:
+            print(f"Using timestamp cues from: {song_list_file}")
+        elif song_titles:
             print(f"Using song titles from: {song_list_file}")
         split_concert_into_songs(
             audio_file,
             output_dir,
             silence_threshold_db=args.silence_threshold_db,
             min_silence_seconds=args.min_silence_seconds,
+            song_cues=song_cues,
             song_titles=song_titles,
         )
         return
