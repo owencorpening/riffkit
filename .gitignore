@@ -85,6 +85,7 @@ config.local.yaml
 config.override.yaml
 .env
 .env.local
+NEXT.md
 
 # Exception: Keep example config
 !config.example.yaml
