@@ -8,6 +8,7 @@ This repo uses a lightweight working loop.
 - Keep `NEXT.md` uncommitted unless the user explicitly wants it versioned.
 - Update `NEXT.md` in place as progress is made and new follow-up steps appear.
 - Use checkboxes for done, next, and still-open items.
+- If a repo also needs Claude compatibility, keep `CLAUDE.md` as a thin wrapper that points at `AGENT.md`.
 
 ## Validation Flow
 
