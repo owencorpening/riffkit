@@ -81,6 +81,7 @@ For a longer view of where the project is headed, see [docs/ROADMAP.md](docs/ROA
 For the concrete scenarios currently in scope, see [docs/USE_CASES.md](docs/USE_CASES.md).
 For the personal concert-library convention, see [docs/LIBRARY.md](docs/LIBRARY.md).
 For the testing approach and fixture plan, see [docs/TESTING.md](docs/TESTING.md).
+For the active working checklist, see [NEXT.md](NEXT.md) and [AGENT.md](AGENT.md).
 
 ***
 
