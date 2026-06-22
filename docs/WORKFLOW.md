@@ -3,6 +3,8 @@
 ## Overview
 This document describes the workflow from an incoming song file to a practice-ready REAPER project.
 
+For command-level procedures, see [docs/sops/README.md](sops/README.md).
+
 ## Typical Flow
 
 1. Receive the song as an MP3, WAV, or similar file.
