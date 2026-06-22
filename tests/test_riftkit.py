@@ -70,6 +70,7 @@ def test_separate_stems_passes_correct_args(tmp_path):
     call_args = mock_run.call_args[0][0]
     assert "-m" in call_args
     assert "demucs" in call_args
+    assert "--mp3" in call_args
     assert "--out" in call_args
     assert str(tmp_path) in call_args
     assert str(audio) in call_args

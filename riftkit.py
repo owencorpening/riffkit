@@ -132,11 +132,19 @@ def parse_song_cues(song_list_file: Path) -> list[tuple[float, str]]:
 
 
 def separate_stems(audio_file: Path, output_dir: Path) -> Path:
-    """Run Demucs on audio_file; return the folder containing the stem WAVs."""
+    """Run Demucs on audio_file; return the folder containing the stem files."""
     print(f"Separating stems: {audio_file.name}")
 
     result = subprocess.run(
-        [sys.executable, "-m", "demucs", "--out", str(output_dir), str(audio_file)],
+        [
+            sys.executable,
+            "-m",
+            "demucs",
+            "--mp3",
+            "--out",
+            str(output_dir),
+            str(audio_file),
+        ],
         text=True,
     )
     if result.returncode != 0:
@@ -148,7 +156,11 @@ def separate_stems(audio_file: Path, output_dir: Path) -> Path:
             f"Expected stems at {stems_dir} but it was not created."
         )
 
-    stem_files = list(stems_dir.glob("*.wav"))
+    stem_files = [
+        path
+        for path in stems_dir.iterdir()
+        if path.suffix.lower() in {".wav", ".mp3", ".flac"}
+    ]
     print(f"  Stems → {stems_dir}")
     for f in sorted(stem_files):
         print(f"    {f.name}")
