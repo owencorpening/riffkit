@@ -72,7 +72,7 @@ Examples:
 
 * a sample MP3 produces the expected output path layout
 * a sample lyric file produces the expected item-note formatting
-* a sample Whisper JSON file matches the expected lyric import structure
+* a sample timestamped transcription JSON file matches the expected lyric import structure
 
 ### 3. Golden-Output Tests
 

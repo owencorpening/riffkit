@@ -10,7 +10,7 @@ A small church band that receives a short set of songs ahead of time and needs t
 
 * 3-4 MP3 or WAV files
 * A performance date
-* Optional lyric source or Whisper transcription output
+* Optional lyric source or transcription output with timestamps
 
 ### Outputs
 

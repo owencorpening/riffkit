@@ -15,6 +15,7 @@ This repo uses a lightweight working loop.
 - For use case #3, validate with real concert files and real output paths in the homedir.
 - After splitting a concert, cycle each resulting song through use case #2 with the real song file.
 - Keep the validation loop tied to the actual file layout the user will use.
+- If the task is mostly search, source discovery, or broad comparison, pass the baton to a search-oriented web agent and bring the result back here for implementation.
 
 ## Commit Hygiene
 
