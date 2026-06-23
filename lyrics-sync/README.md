@@ -2,7 +2,7 @@
 
 This component is the engine behind `riffkit`'s **Learning** and **Composition** modes, turning any audio file into a time-coded, editable project with lyrics and/or chord suggestions.
 
-It uses two primary tools to achieve this: an **OpenAI transcription model** and **custom REAPER Lua scripts**.
+It uses two primary tools to achieve this: **local Whisper transcription** and **custom REAPER Lua scripts**.
 
 ---
 
@@ -24,14 +24,14 @@ This component is a **two-step workflow** that requires one external dependency:
 
 | Step | Action | Required Tool/Dependency | Output |
 | :--- | :--- | :--- | :--- |
-| **Step 1: Transcription** | Run your audio file through the AI model. | **OpenAI `whisper-1`** with `verbose_json` and word timestamps | A **JSON file** containing time-coded lyrics. |
-| **Step 2: Import** | Run the custom script inside REAPER. | **`riftkit/lyrics-sync/InsertLyrics.lua`** (OpenAI JSON) or **`AddLyrics.lua`** (plain text) | Lyrics inserted as timed items on a REAPER track. |
+| **Step 1: Transcription** | Run your audio file through the AI model. | **Local `openai-whisper`** with JSON output and word timestamps | A **JSON file** containing time-coded lyrics. |
+| **Step 2: Import** | Run the custom script inside REAPER. | **`riftkit/lyrics-sync/InsertLyrics.lua`** (Whisper JSON) or **`AddLyrics.lua`** (plain text) | Lyrics inserted as timed items on a REAPER track. |
 
-#### External Dependency: OpenAI Transcription
+#### External Dependency: Local Whisper
 
-You must have a workflow that produces OpenAI-style timestamped JSON. For this pass, use **`whisper-1`** and request `verbose_json` output with `timestamp_granularities[]=word` when you need word-level timestamps.
+You must have a workflow that produces timestamped JSON locally. For this pass, use the repo virtualenv and `openai-whisper` to generate a JSON transcript with word timestamps when you need word-level timing.
 
-* *Note: This repository does not host the transcription model or API client; it is a prerequisite for running this workflow.*
+* *Note: This repository does not host the model weights; it expects a local Whisper install in your working environment.*
 
 ---
 
@@ -40,7 +40,7 @@ You must have a workflow that produces OpenAI-style timestamped JSON. For this p
 #### Step 1: Prepare the JSON
 
 1.  Place the song audio file in your desired project directory.
-2.  Run the audio file through OpenAI transcription to generate a **time-stamped JSON file**.
+2.  Run the audio file through local Whisper transcription to generate a **time-stamped JSON file**.
 3.  Keep the JSON file in the same directory as your REAPER project file (`.RPP`) or wherever you want to browse for it.
 
 #### Step 2: Run the REAPER Script
@@ -49,7 +49,7 @@ Two scripts are available depending on your source material:
 
 | Script | Use when… |
 | :--- | :--- |
-| **`InsertLyrics.lua`** | You have OpenAI JSON with `segments` or `words` timestamps. |
+| **`InsertLyrics.lua`** | You have Whisper JSON with `segments` or `words` timestamps. |
 | **`AddLyrics.lua`** | You have a plain `.txt` file; the script auto-aligns lines to peaks or silences in the Vocals track. |
 
 For either script:
@@ -62,7 +62,7 @@ For either script:
 #### Troubleshooting
 
 * If the lyrics don't appear, verify a track named exactly **Lyrics** exists in the project.
-* For `InsertLyrics.lua`, confirm the JSON contains OpenAI-style `segments` or `words` data, or the older legacy `transcription` array.
+* For `InsertLyrics.lua`, confirm the JSON contains Whisper-style `segments` or `words` data, or the older legacy `transcription` array.
 * For `AddLyrics.lua`, ensure a track named **Vocals** exists with audio — the script uses it for timing detection.
 * Check the REAPER Console for error messages from the script.
 

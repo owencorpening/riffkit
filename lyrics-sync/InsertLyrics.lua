@@ -175,7 +175,7 @@ local function extract_entries(transcript)
     elseif type(transcript.words) == "table" then
         entries = derive_entries_from_words(transcript.words)
     else
-        return nil, "The JSON file does not contain OpenAI `segments` or `words`, or legacy `transcription` data."
+        return nil, "The JSON file does not contain Whisper `segments` or `words`, or legacy `transcription` data."
     end
 
     sort_entries(entries)
@@ -224,7 +224,7 @@ local function insert_lyrics(entries)
     reaper.ShowConsoleMsg("Finished inserting lyrics.\n")
 end
 
-local ret_val, file_path = reaper.GetUserFileNameForRead("", "Select OpenAI JSON File", "*.json")
+local ret_val, file_path = reaper.GetUserFileNameForRead("", "Select Whisper JSON File", "*.json")
 if ret_val then
     local transcript, err = read_json_file(file_path)
     if transcript then

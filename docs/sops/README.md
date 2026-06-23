@@ -12,5 +12,5 @@ These are intentionally practical:
 ## Procedures
 
 - [Stem Separation](stem-separation.md)
-- [OpenAI Transcription](openai-transcription.md)
+- [Local Whisper Transcription](local-transcription.md)
 - [REAPER Lyrics Import](reaper-lyrics-import.md)
