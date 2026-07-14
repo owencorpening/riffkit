@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>riffkit karaoke</title>
+<style>
+  :root {
+    --bg: #0b0e14;
+    --current: #f5f7fa;
+    --sung: #ffb454;
+    --next: #6b7789;
+    --chip: #97a3b3;
+    --accent: #ffb454;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    background: var(--bg);
+    color: var(--current);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    overflow: hidden;
+    cursor: default;
+  }
+
+  #stage {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4vh;
+    padding: 4vw;
+    text-align: center;
+  }
+
+  /* Current line: the live lyric, readable from across a room. */
+  #current {
+    font-size: clamp(2.2rem, 7vw, 7rem);
+    font-weight: 700;
+    line-height: 1.25;
+    min-height: 1.25em;
+    text-wrap: balance;
+  }
+  #current .word { transition: color 120ms linear; }
+  #current .word.sung { color: var(--sung); }
+
+  /* Next line: clearly secondary — dimmed and smaller. */
+  #next {
+    font-size: clamp(1.3rem, 3.8vw, 3.8rem);
+    font-weight: 500;
+    line-height: 1.3;
+    min-height: 1.3em;
+    color: var(--next);
+    text-wrap: balance;
+  }
+
+  /* Instrumental-gap marker shown in the current slot. */
+  #current.gap { color: var(--next); letter-spacing: 0.4em; }
+
+  /* Status chip: small, corner, out of the performers' way. */
+  #chip {
+    position: fixed;
+    bottom: 1rem;
+    left: 1rem;
+    font-size: 0.85rem;
+    color: var(--chip);
+    background: rgba(255, 255, 255, 0.06);
+    border-radius: 0.5rem;
+    padding: 0.3rem 0.7rem;
+    display: flex;
+    gap: 0.6rem;
+    align-items: center;
+    opacity: 0.9;
+  }
+  #dot {
+    width: 0.55rem; height: 0.55rem; border-radius: 50%;
+    background: #e05661;
+  }
+  #dot.ok { background: #7fd962; }
+  #dot.demo { background: #59c2ff; }
+
+  /* Song picker: only visible until a transcript is loaded. */
+  #picker {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1.2rem;
+    background: var(--bg);
+  }
+  #picker h1 { font-size: 1.6rem; font-weight: 600; }
+  #picker p { color: var(--chip); max-width: 34rem; text-align: center; line-height: 1.5; }
+  #picker code { color: var(--accent); }
+  #picker input { display: none; }
+  #picker label {
+    background: var(--accent);
+    color: #1a1005;
+    font-weight: 600;
+    padding: 0.7rem 1.4rem;
+    border-radius: 0.6rem;
+    cursor: pointer;
+  }
+  #picker.dragover { outline: 3px dashed var(--accent); outline-offset: -1.5rem; }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+
+<div id="picker">
+  <h1>riffkit karaoke</h1>
+  <p>Load a <code>riffkit-transcript-v1</code> JSON (from
+     <code>lyrics-sync/transcribe_adaptive.py</code>) — click, drop a file
+     anywhere, or open this page with <code>?src=songs/my-song.json</code>.</p>
+  <label for="file">Choose transcript JSON</label>
+  <input id="file" type="file" accept=".json,application/json">
+  <p id="picker-error" style="color:#e05661"></p>
+</div>
+
+<div id="stage" class="hidden">
+  <div id="current"></div>
+  <div id="next"></div>
+</div>
+
+<div id="chip" class="hidden">
+  <span id="dot"></span>
+  <span id="song"></span>
+  <span id="pos"></span>
+</div>
+
+<script>
+"use strict";
+
+/* ------------------------------------------------------------------ *
+ * riffkit karaoke display (session 2)
+ *
+ * Drives a current/next lyric display off REAPER's built-in web
+ * interface: this file is served from reaper_www_root, and playback
+ * position is polled from the same-origin endpoint /_/TRANSPORT.
+ * Between polls the position is extrapolated with the wall clock, and
+ * every frame maps position -> line statelessly, so seeks and scrubs
+ * can never leave the display stuck on an old line.
+ *
+ * ?src=path.json  transcript to load (relative to this page)
+ * ?demo=1         internal clock instead of REAPER (space = play/pause,
+ *                 arrows = seek) — for testing the display alone
+ * ------------------------------------------------------------------ */
+
+const POLL_MS = 100;          // transport poll interval
+const LINE_HOLD_S = 1.5;      // keep a finished line up this long before gap mode
+const GAP_MARKER = "♪ ♪ ♪";
+
+const params = new URLSearchParams(location.search);
+const demoMode = params.get("demo") === "1";
+
+const el = {
+  picker: document.getElementById("picker"),
+  pickerError: document.getElementById("picker-error"),
+  file: document.getElementById("file"),
+  stage: document.getElementById("stage"),
+  current: document.getElementById("current"),
+  next: document.getElementById("next"),
+  chip: document.getElementById("chip"),
+  dot: document.getElementById("dot"),
+  song: document.getElementById("song"),
+  pos: document.getElementById("pos"),
+};
+
+/* ---------------- transcript loading ---------------- */
+
+let lines = [];        // [{start, end, text, words: [{word, start}]}]
+let songName = "";
+
+function setTranscript(doc, name) {
+  const segments = doc.segments || [];
+  lines = segments
+    .map((s) => ({
+      start: s.start,
+      end: s.end,
+      text: (s.text || "").trim(),
+      words: (s.words || []).map((w) => ({ word: w.word, start: w.start })),
+    }))
+    .filter((l) => l.text)
+    .sort((a, b) => a.start - b.start);
+  songName = name.replace(/\.json$/i, "");
+  el.song.textContent = songName;
+  el.picker.classList.add("hidden");
+  el.stage.classList.remove("hidden");
+  el.chip.classList.remove("hidden");
+  renderedLine = null;   // force re-render
+}
+
+function loadFromText(text, name) {
+  try {
+    setTranscript(JSON.parse(text), name);
+  } catch (e) {
+    el.pickerError.textContent = `Could not parse ${name}: ${e.message}`;
+  }
+}
+
+el.file.addEventListener("change", () => {
+  const f = el.file.files[0];
+  if (f) f.text().then((t) => loadFromText(t, f.name));
+});
+document.addEventListener("dragover", (e) => {
+  e.preventDefault();
+  el.picker.classList.add("dragover");
+});
+document.addEventListener("dragleave", () => el.picker.classList.remove("dragover"));
+document.addEventListener("drop", (e) => {
+  e.preventDefault();
+  el.picker.classList.remove("dragover");
+  const f = e.dataTransfer.files[0];
+  if (f) f.text().then((t) => loadFromText(t, f.name));
+});
+
+const src = params.get("src");
+if (src) {
+  fetch(src)
+    .then((r) => (r.ok ? r.text() : Promise.reject(new Error(`HTTP ${r.status}`))))
+    .then((t) => loadFromText(t, src.split("/").pop()))
+    .catch((e) => (el.pickerError.textContent = `Could not fetch ${src}: ${e.message}`));
+}
+
+/* ---------------- playback clock ---------------- */
+
+// Latest known transport state; extrapolated between polls.
+const clock = { pos: 0, at: performance.now(), playing: false, connected: false };
+
+function now() {
+  const drift = clock.playing ? (performance.now() - clock.at) / 1000 : 0;
+  return clock.pos + drift;
+}
+
+if (!demoMode) {
+  // REAPER web interface: "TRANSPORT \t playstate \t position_seconds \t ..."
+  // playstate: 0 stop, 1 play, 2 pause, 5 record.
+  setInterval(async () => {
+    try {
+      const text = await (await fetch("/_/TRANSPORT")).text();
+      const f = text.trim().split("\t");
+      const playstate = parseInt(f[1], 10);
+      const pos = parseFloat(f[2]);
+      if (!Number.isFinite(pos)) throw new Error("bad transport line");
+      clock.pos = pos;
+      clock.at = performance.now();
+      clock.playing = playstate === 1 || playstate === 5;
+      clock.connected = true;
+    } catch {
+      clock.connected = false;
+      clock.playing = false;  // freeze rather than drift while unreachable
+    }
+  }, POLL_MS);
+} else {
+  clock.connected = true;
+  clock.playing = true;
+  document.addEventListener("keydown", (e) => {
+    if (e.code === "Space") {
+      clock.pos = now();
+      clock.at = performance.now();
+      clock.playing = !clock.playing;
+      e.preventDefault();
+    } else if (e.code === "ArrowRight" || e.code === "ArrowLeft") {
+      clock.pos = Math.max(0, now() + (e.code === "ArrowRight" ? 5 : -5));
+      clock.at = performance.now();
+    }
+  });
+}
+
+/* ---------------- position -> lines ---------------- */
+
+// Index of the last line with start <= pos, or -1. Stateless on purpose:
+// seeking anywhere resolves correctly on the very next frame.
+function lineIndexAt(pos) {
+  let lo = 0, hi = lines.length - 1, ans = -1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (lines[mid].start <= pos) { ans = mid; lo = mid + 1; }
+    else hi = mid - 1;
+  }
+  return ans;
+}
+
+/* ---------------- render loop ---------------- */
+
+let renderedLine = null;   // cache key to avoid rebuilding DOM every frame
+
+function renderLine(idx, gap) {
+  const key = `${idx}:${gap}`;
+  if (renderedLine === key) return;
+  renderedLine = key;
+
+  el.current.classList.toggle("gap", gap);
+  if (gap || idx < 0) {
+    el.current.textContent = GAP_MARKER;
+  } else {
+    const line = lines[idx];
+    el.current.innerHTML = "";
+    const words = line.words.length ? line.words : [{ word: line.text, start: line.start }];
+    for (const w of words) {
+      const span = document.createElement("span");
+      span.className = "word";
+      span.dataset.start = w.start;
+      span.textContent = w.word;
+      el.current.appendChild(span);
+    }
+  }
+  const next = lines[idx + 1];
+  el.next.textContent = next ? next.text : "";
+}
+
+function frame() {
+  if (lines.length) {
+    const pos = now();
+    const idx = lineIndexAt(pos);
+    const line = idx >= 0 ? lines[idx] : null;
+    // Hold a finished line briefly so short inter-line gaps don't flicker;
+    // only fall to gap mode when the silence is real.
+    const gap =
+      !line ||
+      (pos > line.end + LINE_HOLD_S &&
+        (idx + 1 >= lines.length || lines[idx + 1].start - pos > LINE_HOLD_S));
+
+    renderLine(idx, gap);
+    if (!gap && line) {
+      for (const span of el.current.children) {
+        span.classList.toggle("sung", pos >= parseFloat(span.dataset.start));
+      }
+    }
+
+    const m = Math.floor(Math.max(0, pos) / 60);
+    const s = (Math.max(0, pos) % 60).toFixed(1).padStart(4, "0");
+    el.pos.textContent = `${m}:${s}`;
+  }
+  el.dot.className = demoMode ? "demo" : clock.connected ? "ok" : "";
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
