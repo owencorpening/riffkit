@@ -36,6 +36,7 @@ From the repo root:
 ## Notes
 
 - This is the default path for the repo now.
+- Hosted OpenAI transcription was tried for `08 - Foxy Lady` on `2026-06-22` and failed with `insufficient_quota`, so this local path is the working default.
 - If you want a different balance of speed and accuracy, change `--model` to `base`, `small`, `medium`, or another installed Whisper model.
 - Keep the JSON in your homedir workflow area so you can pick it up in REAPER later.
 
