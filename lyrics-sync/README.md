@@ -24,7 +24,7 @@ This component is a **two-step workflow** that requires one external dependency:
 
 | Step | Action | Required Tool/Dependency | Output |
 | :--- | :--- | :--- | :--- |
-| **Step 1: Transcription** | Run your audio file through the AI model. | **Local `openai-whisper`** with JSON output and word timestamps | A **JSON file** containing time-coded lyrics. |
+| **Step 1: Transcription** | Run the vocal stem through `transcribe_adaptive.py` (adaptive multi-pass local Whisper). | **Local `openai-whisper`** via `lyrics-sync/transcribe_adaptive.py` | A **`riffkit-transcript-v1` JSON file** with word-level timestamps. |
 | **Step 2: Import** | Run the custom script inside REAPER. | **`riftkit/lyrics-sync/InsertLyrics.lua`** (Whisper JSON) or **`AddLyrics.lua`** (plain text) | Lyrics inserted as timed items on a REAPER track. |
 
 #### External Dependency: Local Whisper
@@ -39,8 +39,14 @@ You must have a workflow that produces timestamped JSON locally. For this pass, 
 
 #### Step 1: Prepare the JSON
 
-1.  Place the song audio file in your desired project directory.
-2.  Run the audio file through local Whisper transcription to generate a **time-stamped JSON file**.
+1.  Place the song audio file (ideally an isolated vocals stem) in your desired project directory.
+2.  Run the adaptive transcription pipeline — see [docs/session1-transcription-notes.md](../docs/session1-transcription-notes.md) for full options:
+
+    ```bash
+    .venv/bin/python lyrics-sync/transcribe_adaptive.py vocals.mp3 \
+      --lyrics reference_lyrics.txt   # optional: disambiguates misheard words
+    ```
+
 3.  Keep the JSON file in the same directory as your REAPER project file (`.RPP`) or wherever you want to browse for it.
 
 #### Step 2: Run the REAPER Script

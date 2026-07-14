@@ -462,10 +462,12 @@ def main():
     # Step 2: Copy REAPER template alongside stems
     rpp_path = copy_template(stems_dir)
 
-    # Step 3: Lyrics transcription (TODO)
+    # Step 3: Lyrics transcription (manual for now)
     if not args.no_lyrics:
-        print("\n[TODO] Lyrics transcription not yet implemented.")
-        print("       Run lyrics-sync/transcribe.py manually for now.")
+        print("\n[TODO] Lyrics transcription is not wired into this pipeline yet.")
+        print("       Run lyrics-sync/transcribe_adaptive.py on the vocals stem:")
+        print(f"       .venv/bin/python lyrics-sync/transcribe_adaptive.py "
+              f"'{stems_dir}/vocals.mp3'")
 
     print(f"""
 Done!
