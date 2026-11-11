@@ -3,20 +3,20 @@ Fill in by ear. Times are where each song STARTS in the audio file (mm:ss or h:m
 Gap? = was there a real pause before this song?  Y = clean break, N = runs straight in (gapless)
 
 #   Start     Gap?  Song
-1   ______    -     Spanish Castle Magic
-2   ______    _     Killing Floor
-3   ______    _     Hear My Train A-Comin'
-4   ______    _     Message To Love
-5   ______    _     Hey Baby
-6   ______    _     In From The Storm
-7   ______    _     Hey Joe
-8   ______    _     Foxy Lady
-9   ______    _     Red House
-10  ______    _     Room Full Of Mirrors
-11  ______    _     Straight Ahead
-12  ______    _     Purple Haze
-13  ______    _     Voodoo Child (Slight Return)
-End ______          (end of last song / applause)
+1   0:17.7    N     Spanish Castle Magic
+2   5:36.0    Y     Killing Floor
+3   10:22.0   Y     Hear My Train A-Comin'
+4   23:44.0   Y     Message To Love
+5   32:23.9   N     Hey Baby
+6   41:04.0   Y     In From The Storm
+7   45:08.7   Y     Hey Joe
+8   50:11.8   Y     Foxy Lady
+9   55:54.2   Y     Red House
+10  65:58.1   Y     Room Full Of Mirrors
+11  69:20.0   Y     Straight Ahead
+12  74:34.3   Y     Purple Haze
+13  77:53.6   Y     Voodoo Child (Slight Return)
+End 89:31.4         (end of last song / applause)
 
 Notes (anything odd: false starts, tuning, jams that blend songs, stage talk):
 
