@@ -1,0 +1,22 @@
+ANSWER KEY - Hendrix, Gothenburg 1970-09-01
+Fill in by ear. Times are where each song STARTS in the audio file (mm:ss or h:mm:ss).
+Gap? = was there a real pause before this song?  Y = clean break, N = runs straight in (gapless)
+
+#   Start     Gap?  Song
+1   ______    -     Spanish Castle Magic
+2   ______    _     Killing Floor
+3   ______    _     Hear My Train A-Comin'
+4   ______    _     Message To Love
+5   ______    _     Hey Baby
+6   ______    _     In From The Storm
+7   ______    _     Hey Joe
+8   ______    _     Foxy Lady
+9   ______    _     Red House
+10  ______    _     Room Full Of Mirrors
+11  ______    _     Straight Ahead
+12  ______    _     Purple Haze
+13  ______    _     Voodoo Child (Slight Return)
+End ______          (end of last song / applause)
+
+Notes (anything odd: false starts, tuning, jams that blend songs, stage talk):
+
