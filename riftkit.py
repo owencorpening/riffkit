@@ -7,6 +7,8 @@ Usage:
     ./riftkit.py <song.mp3> --output ~/music/projects
     ./riftkit.py <song.mp3> --no-lyrics
     ./riftkit.py <concert.mp3> --split-concert
+    ./riftkit.py <concert.mp3> --split-concert --setlist-mode \
+        --song-list setlist.txt --transcript whisper.json
 
 Steps:
     1. Separate stems with Demucs (vocals, drums, bass, other)
@@ -335,10 +337,16 @@ def split_concert_into_songs(
     min_silence_seconds: float = 8.0,
     song_cues: list[tuple[float, str]] | None = None,
     song_titles: list[str] | None = None,
+    end_time: float | None = None,
 ) -> Path:
-    """Split a concert file into numbered song files using silence gaps."""
+    """Split a concert file into numbered song files using silence gaps.
+
+    ``end_time`` only applies when ``song_cues`` are given: the last song
+    stops there instead of running to the end of the file.
+    """
     duration = probe_duration(audio_file)
-    cue_segments = build_song_segments_from_cues(duration, song_cues or [])
+    cue_limit = min(duration, end_time) if end_time else duration
+    cue_segments = build_song_segments_from_cues(cue_limit, song_cues or [])
     if cue_segments:
         segments = cue_segments
         use_cues = True
@@ -392,6 +400,57 @@ def split_concert_into_songs(
     return split_dir
 
 
+def split_concert_by_setlist(
+    audio_file: Path,
+    output_dir: Path,
+    song_list_file: Path,
+    transcript_file: Path | None = None,
+) -> Path:
+    """Split a concert using the setlist to decide where each song starts.
+
+    Unlike pause detection this places exactly one boundary per setlist song,
+    so it copes with noisy breaks and songs that run into each other.
+    """
+    import setlist_split  # deferred: needs numpy
+
+    if not song_list_file.exists():
+        raise RuntimeError(f"Setlist mode needs a setlist file; not found: {song_list_file}")
+    titles = setlist_split.parse_setlist(song_list_file)
+    if len(titles) < 2:
+        raise RuntimeError(f"Setlist mode needs at least two song titles in {song_list_file}")
+
+    transcript = None
+    if transcript_file is not None:
+        if not transcript_file.exists():
+            raise RuntimeError(f"Transcript not found: {transcript_file}")
+        transcript = setlist_split.load_transcript(transcript_file)
+        print(f"Using transcript: {transcript_file}")
+    else:
+        print(
+            "No --transcript given. Boundaries come from the audio only, so a quiet "
+            "passage inside a song can be mistaken for a song break.\n"
+            "  See docs/sops/local-transcription.md to make one."
+        )
+
+    print(f"Setlist mode: {len(titles)} songs from {song_list_file}")
+    split = setlist_split.detect_setlist_boundaries(audio_file, titles, transcript)
+    boundaries_text = setlist_split.format_boundaries(split)
+    print("\nBoundaries:")
+    print(boundaries_text)
+    for note in split.notes:
+        print(f"Note: {note}")
+    print()
+
+    split_dir = split_concert_into_songs(
+        audio_file,
+        output_dir,
+        song_cues=split.cues(),
+        end_time=split.end,
+    )
+    (split_dir / "boundaries.txt").write_text(boundaries_text + "\n", encoding="utf-8")
+    return split_dir
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Process an audio file into a practice-ready REAPER project"
@@ -424,6 +483,17 @@ def main():
         "--song-list",
         help="Sidecar text file with one song title per line, in order",
     )
+    parser.add_argument(
+        "--setlist-mode",
+        action="store_true",
+        help="With --split-concert and --song-list: find one boundary per setlist "
+             "song from the audio itself, instead of relying on silent gaps",
+    )
+    parser.add_argument(
+        "--transcript",
+        help="Whisper JSON transcript of the concert (word timestamps), used by "
+             "--setlist-mode to keep each title on the right song",
+    )
 
     args = parser.parse_args()
 
@@ -440,6 +510,14 @@ def main():
 
     if args.split_concert:
         song_list_file = Path(args.song_list).expanduser().resolve() if args.song_list else audio_file.with_suffix(".txt")
+        if args.setlist_mode:
+            split_concert_by_setlist(
+                audio_file,
+                output_dir,
+                song_list_file,
+                Path(args.transcript).expanduser().resolve() if args.transcript else None,
+            )
+            return
         song_cues = parse_song_cues(song_list_file) if song_list_file.exists() else []
         song_titles = parse_song_titles(song_list_file) if song_list_file.exists() and not song_cues else []
         if song_cues:

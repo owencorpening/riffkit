@@ -3,3 +3,6 @@
 
 openai-whisper>=20231117
 PyYAML>=6.0
+
+# Needed for --setlist-mode
+numpy>=1.24
