@@ -17,11 +17,26 @@ GOTHENBURG = FIXTURES_DIR / "gothenburg"
 # ---------------------------------------------------------------------------
 
 def test_parse_setlist_reads_gothenburg_fixture():
-    titles = ss.parse_setlist(GOTHENBURG / "setlist.txt")
-    assert len(titles) == 13
-    assert titles[0] == "Spanish Castle Magic"
-    assert titles[4] == "Hey Baby"
-    assert titles[-1] == "Voodoo Child (Slight Return)"
+    entries = ss.parse_setlist(GOTHENBURG / "setlist.txt")
+    songs = [t for t in entries if not ss.is_skip_entry(t)]
+    assert len(songs) == 13
+    assert songs[0] == "Spanish Castle Magic"
+    assert songs[4] == "Hey Baby"
+    assert songs[-1] == "Voodoo Child (Slight Return)"
+    # two solos are marked as skip entries: before song 1 and before Hey Baby
+    assert entries[0] == "(solo)"
+    assert entries[entries.index("Hey Baby") - 1] == "(solo)"
+
+
+def test_parse_setlist_keeps_skip_entries_in_place(tmp_path):
+    f = tmp_path / "setlist.txt"
+    f.write_text("1. First\n(drum solo)\n2. Second\n- (jam)\n3. Third (Reprise)\n")
+    assert ss.parse_setlist(f) == ["First", "(drum solo)", "Second", "(jam)", "Third (Reprise)"]
+
+
+def test_is_skip_entry_only_when_wholly_in_parentheses():
+    assert ss.is_skip_entry("(solo)")
+    assert not ss.is_skip_entry("Voodoo Child (Slight Return)")
 
 
 def test_parse_setlist_ignores_concert_header_lines(tmp_path):
@@ -54,7 +69,8 @@ def test_find_breaks_cuts_before_the_band_comes_back():
     assert len(breaks) == 1
     assert breaks[0].start == pytest.approx(100.0, abs=0.5)
     assert breaks[0].end == pytest.approx(108.0, abs=0.5)
-    assert breaks[0].cut == pytest.approx(105.0, abs=0.5)  # 3 s pre-roll
+    assert breaks[0].cut == pytest.approx(103.5, abs=0.5)   # 4.5 s before the band is back
+    assert breaks[0].stop() == pytest.approx(100.0, abs=0.5)  # previous song stops where the break begins
 
 
 def test_find_breaks_merges_dips_separated_by_short_noise():
@@ -62,7 +78,8 @@ def test_find_breaks_merges_dips_separated_by_short_noise():
     level = _level((100, -10), (5, -35), (4, -16), (5, -40), (100, -10))
     breaks = [b for b in ss.find_breaks(level) if b.kind == "break"]
     assert len(breaks) == 1
-    assert breaks[0].cut == pytest.approx(111.0, abs=0.6)  # in the deeper, later dip
+    assert breaks[0].cut == pytest.approx(109.5, abs=0.6)   # counted back from the deeper, later dip
+    assert breaks[0].stop() == pytest.approx(100.0, abs=0.5)
 
 
 def test_find_breaks_treats_short_full_volume_burst_as_previous_songs_ending():
@@ -70,7 +87,9 @@ def test_find_breaks_treats_short_full_volume_burst_as_previous_songs_ending():
     level = _level((100, -10), (4, -40), (8, -10), (1.5, -30), (100, -10))
     breaks = [b for b in ss.find_breaks(level) if b.kind == "break"]
     assert len(breaks) == 1
-    assert breaks[0].cut == pytest.approx(112.0, abs=0.6)  # after the flourish, not at 100
+    assert 104.0 <= breaks[0].cut <= 113.5                  # after the first pause, not at 100
+    assert breaks[0].cut == pytest.approx(109.0, abs=0.6)
+    assert breaks[0].stop() == pytest.approx(100.0, abs=0.5)
 
 
 def test_find_breaks_ignores_blips_shorter_than_minimum():
@@ -183,6 +202,26 @@ def test_choose_boundaries_respects_minimum_song_length():
         ss.choose_boundaries(cands, [], 3, 0.0, 900.0) == [300, 600]
 
 
+def test_choose_boundaries_allows_short_skip_entries():
+    # song, 30 s solo, song: the solo is shorter than a song is allowed to be
+    cands = [_cand(300, 1.0), _cand(330, 1.0)]
+    assert ss.choose_boundaries(cands, [], 3, 0.0, 900.0) is None
+    assert ss.choose_boundaries(cands, [], 3, 0.0, 900.0, min_lengths=[60, 20, 60]) == [300, 330]
+
+
+def test_split_from_features_gives_each_song_its_own_end():
+    # two songs with a 10 s break between them and applause at the end
+    level = _level((200, -10), (10, -40), (200, -10), (10, -40))
+    chroma = np.tile(np.eye(12)[0], (420, 1))
+    shares = np.tile([0.5, 0.2, 0.15, 0.1, 0.05], (420, 1))
+    split = ss.split_from_features(["One", "Two"], level, chroma, shares, 420.0)
+    (s1, e1, _), (s2, e2, _) = split.segments()
+    assert e1 == pytest.approx(200.0, abs=0.5)      # stops where the break begins
+    assert s2 == pytest.approx(205.5, abs=0.5)      # starts 4.5 s before the band is back
+    assert e2 == pytest.approx(410.0, abs=0.5)
+    assert split.checks == [[], []]
+
+
 def test_choose_boundaries_returns_none_when_too_few_candidates():
     assert ss.choose_boundaries([_cand(300, 1.0)], [], 4, 0.0, 900.0) is None
 
@@ -218,11 +257,40 @@ def test_format_time_matches_boundaries_file_style():
 
 
 def test_format_boundaries_lists_every_song_and_the_end():
-    split = ss.SetlistSplit(titles=["A", "B"], starts=[0.0, 125.5], end=300.0)
-    text = ss.format_boundaries(split)
-    assert "1   0:00.0    A" in text
-    assert "2   2:05.5    B" in text
-    assert text.splitlines()[-1].startswith("End 5:00.0")
+    split = ss.SetlistSplit(
+        titles=["A", "(solo)", "B"], starts=[0.0, 120.0, 150.5], ends=[118.0, 150.5, 300.0],
+        checks=[[], ["start: no pause here"], ["start: no pause here"]],
+    )
+    lines = ss.format_boundaries(split).splitlines()
+    assert lines[1].split() == ["1", "0:00.0", "1:58.0", "ok", "A"]
+    assert lines[2].split() == ["-", "2:00.0", "2:30.5", "CHECK", "(solo)"]
+    assert lines[3].split() == ["2", "2:30.5", "5:00.0", "CHECK", "B"]
+    assert "Listen to these:" in lines
+
+
+def test_segments_leave_out_skip_entries():
+    split = ss.SetlistSplit(
+        titles=["A", "(solo)", "B"], starts=[0.0, 120.0, 150.5], ends=[118.0, 150.5, 300.0],
+    )
+    assert split.segments() == [(0.0, 118.0, "A"), (150.5, 300.0, "B")]
+
+
+def test_read_boundaries_file_round_trips_printed_list(tmp_path):
+    split = ss.SetlistSplit(
+        titles=["A", "(solo)", "B (Live)"], starts=[0.0, 120.0, 150.5], ends=[118.0, 150.5, 3958.1],
+        checks=[[], [], ["start: no pause here"]],
+    )
+    f = tmp_path / "boundaries.txt"
+    f.write_text(ss.format_boundaries(split) + "\n")
+    assert ss.read_boundaries_file(f) == [(0.0, 118.0, "A"), (150.5, 3958.1, "B (Live)")]
+
+
+def test_read_boundaries_file_reads_hand_marked_answer_key():
+    segments = ss.read_boundaries_file(GOTHENBURG / "boundaries.txt")
+    assert len(segments) == 13
+    assert segments[0][2] == "Spanish Castle Magic"
+    assert segments[-1][2] == "Voodoo Child (Slight Return)"
+    assert all(end > start for start, end, _ in segments)
 
 
 # ---------------------------------------------------------------------------
@@ -263,7 +331,37 @@ def test_split_concert_by_setlist_writes_boundaries_and_uses_cue_path(tmp_path):
             patch("riftkit.export_segment", side_effect=lambda a, d, s, e: calls.append((d.name, s, e))):
         split_dir = riftkit.split_concert_by_setlist(audio, tmp_path, setlist)
     assert calls == [("01 - First.mp3", 5.0, 200.0), ("02 - Second.mp3", 200.0, 390.0)]
-    assert "2   3:20.0    Second" in (split_dir / "boundaries.txt").read_text()
+    assert "2   3:20.0    6:30.0    ok     Second" in (split_dir / "boundaries.txt").read_text()
+
+
+def test_song_segments_are_exported_as_given(tmp_path):
+    audio = tmp_path / "show.mp3"
+    audio.touch()
+    calls = []
+    with patch("riftkit.probe_duration", return_value=1000.0), \
+            patch("riftkit.export_segment", side_effect=lambda a, d, s, e: calls.append((d.name, s, e))):
+        riftkit.split_concert_into_songs(
+            audio, tmp_path, song_segments=[(10.0, 380.0, "A"), (400.0, 900.0, "B")]
+        )
+    assert calls == [("01 - A.mp3", 10.0, 380.0), ("02 - B.mp3", 400.0, 900.0)]
+
+
+def test_split_concert_by_boundaries_runs_no_detection(tmp_path):
+    audio = tmp_path / "show.mp3"
+    audio.touch()
+    boundaries = tmp_path / "boundaries.txt"
+    boundaries.write_text(
+        "#   Start     End       Check  Song\n"
+        "-   0:05.0    1:00.0    CHECK  (solo)\n"
+        "1   1:00.0    3:10.0    CHECK  First\n"
+        "2   3:20.0    6:30.0    ok     Second\n"
+    )
+    calls = []
+    with patch("setlist_split.detect_setlist_boundaries", side_effect=AssertionError("detection ran")), \
+            patch("riftkit.probe_duration", return_value=400.0), \
+            patch("riftkit.export_segment", side_effect=lambda a, d, s, e: calls.append((d.name, s, e))):
+        riftkit.split_concert_by_boundaries(audio, tmp_path, boundaries)
+    assert calls == [("01 - First.mp3", 60.0, 190.0), ("02 - Second.mp3", 200.0, 390.0)]
 
 
 def test_split_concert_by_setlist_needs_a_setlist(tmp_path):
