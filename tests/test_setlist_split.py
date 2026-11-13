@@ -369,3 +369,35 @@ def test_split_concert_by_setlist_needs_a_setlist(tmp_path):
     audio.touch()
     with pytest.raises(RuntimeError, match="setlist file"):
         riftkit.split_concert_by_setlist(audio, tmp_path, tmp_path / "missing.txt")
+
+
+# ---------------------------------------------------------------------------
+# Beat
+# ---------------------------------------------------------------------------
+
+def test_beat_strength_is_high_for_steady_clicks_and_low_for_noise():
+    rate = ss.ANALYSIS_SAMPLE_RATE
+    rng = np.random.default_rng(0)
+    noise = (rng.standard_normal(rate * 20) * 0.1).astype(np.float32)
+    clicks = np.zeros(rate * 20, dtype=np.float32)
+    for beat in np.arange(0, 20, 0.5):               # 120 beats per minute
+        at = int(beat * rate)
+        clicks[at:at + 200] = rng.standard_normal(200) * 0.8
+    strength = ss.beat_strength(np.concatenate([noise, clicks]))
+    assert len(strength) == 40
+    assert strength[25:35].mean() > 0.5
+    assert strength[5:15].mean() < 0.25
+
+
+def test_find_beat_starts_marks_where_a_steady_beat_sets_in():
+    free = np.full(120, 0.1)
+    steady = np.full(120, 0.4)
+    starts = ss.find_beat_starts(np.concatenate([free, steady]))
+    assert [b.kind for b in starts] == ["beat"]
+    assert starts[0].cut == pytest.approx(120.0, abs=1.0)
+
+
+def test_find_beat_starts_ignores_a_short_break_in_the_beat():
+    strength = np.full(400, 0.4)
+    strength[200:210] = 0.1                           # a ten second drum-less passage
+    assert ss.find_beat_starts(strength) == []
