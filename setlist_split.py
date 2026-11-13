@@ -199,6 +199,88 @@ def tone_features(samples, sample_rate: int = ANALYSIS_SAMPLE_RATE):
 
 
 # ---------------------------------------------------------------------------
+# Beat
+# ---------------------------------------------------------------------------
+
+def beat_strength(samples, sample_rate: int = ANALYSIS_SAMPLE_RATE, window_seconds: float = 8.0):
+    """How clear a steady beat is, one value (0..1) per second.
+
+    Note onsets are found from sudden rises in the spectrum. For each second,
+    the onsets in the surrounding ``window_seconds`` are compared with
+    themselves shifted by every beat length from 60 to 200 beats per minute.
+    A band playing in time repeats strongly at its beat length; free playing,
+    feedback, talk and applause do not.
+    """
+    import numpy as np
+
+    frame = 1024
+    hop = 256
+    count = (len(samples) - frame) // hop
+    seconds = int(len(samples) / sample_rate)
+    if count <= 0 or seconds <= 0:
+        return np.zeros(0)
+    window = np.hanning(frame).astype(np.float32)
+    onsets = np.zeros(count, dtype=np.float32)
+    previous = None
+    block = 4000
+    for start in range(0, count, block):
+        stop = min(count, start + block)
+        index = np.arange(start, stop)[:, None] * hop + np.arange(frame)[None, :]
+        spectrum = np.log1p(50.0 * np.abs(np.fft.rfft(samples[index] * window, axis=1)))
+        rise = np.diff(np.vstack([previous if previous is not None else spectrum[:1], spectrum]), axis=0)
+        onsets[start:stop] = np.maximum(0.0, rise).sum(axis=1)
+        previous = spectrum[-1:]
+
+    rate = sample_rate / hop
+    half = int(window_seconds / 2 * rate)
+    shortest = int(0.30 * rate)   # 200 beats per minute
+    longest = int(1.00 * rate)    # 60 beats per minute
+    strength = np.zeros(seconds)
+    for second in range(seconds):
+        centre = int(second * rate)
+        if centre - half < 0 or centre + half > count:
+            continue
+        piece = onsets[centre - half:centre + half].astype(np.float64)
+        piece -= piece.mean()
+        repeat = np.correlate(piece, piece, "full")[len(piece) - 1:]
+        if repeat[0] <= 0:
+            continue
+        strength[second] = float(repeat[shortest:longest].max() / repeat[0])
+    return strength
+
+
+def find_beat_starts(strength, window_seconds: int = 60, clear: float = 0.25,
+                     min_rise: float = 0.4, spacing_seconds: int = 40) -> list["Break"]:
+    """Find where a steady beat sets in and stays.
+
+    Compares the share of seconds with a clear beat in the minute after each
+    point with the minute before it. A song that follows free playing shows a
+    large, lasting rise; a drum fill or a short break inside a song does not.
+    """
+    import numpy as np
+
+    strength = np.asarray(strength, dtype=np.float64)
+    n = len(strength)
+    w = window_seconds
+    if n < 2 * w + 1:
+        return []
+    total = np.concatenate(([0.0], np.cumsum((strength > clear).astype(np.float64))))
+    rise = np.zeros(n)
+    index = np.arange(w, n - w)
+    rise[index] = (total[index + w] - total[index]) / w - (total[index] - total[index - w]) / w
+
+    out = []
+    for t in range(w, n - w):
+        lo, hi = max(0, t - spacing_seconds), min(n, t + spacing_seconds + 1)
+        if rise[t] >= min_rise and rise[t] == rise[lo:hi].max() and rise[t] > rise[t - 1]:
+            out.append(Break(
+                start=float(t), end=float(t), depth_db=0.0, quiet_seconds=0.0,
+                cut=float(t), score=0.8 * min(1.0, float(rise[t])), kind="beat",
+            ))
+    return out
+
+
+# ---------------------------------------------------------------------------
 # Breaks
 # ---------------------------------------------------------------------------
 
@@ -209,6 +291,7 @@ class Break:
     kind          "break"   the band drops out (deep dip in level)
                   "lull"    the level sags without really stopping
                   "change"  no drop in level, but the tone balance shifts
+                  "beat"    no drop in level, but a steady beat sets in
     start / end   seconds, the whole stretch (a break is usually several dips
                   with applause, talk or tuning between them)
     cut           where the next song starts if this candidate is chosen
@@ -719,7 +802,8 @@ def detect_setlist_boundaries(
     duration = len(samples) / ANALYSIS_SAMPLE_RATE
     level = level_curve(samples)
     chroma, shares = tone_features(samples)
-    return split_from_features(titles, level, chroma, shares, duration, transcript, min_song_seconds)
+    beat = beat_strength(samples)
+    return split_from_features(titles, level, chroma, shares, duration, transcript, min_song_seconds, beat=beat)
 
 
 SKIP_MIN_SECONDS = 20.0
@@ -727,11 +811,13 @@ SKIP_MIN_SECONDS = 20.0
 
 def split_from_features(titles, level, chroma, shares, duration: float,
                         transcript: dict | None = None,
-                        min_song_seconds: float = 60.0) -> SetlistSplit:
+                        min_song_seconds: float = 60.0,
+                        beat=None) -> SetlistSplit:
     """The decision step, separated from audio decoding so it can be tested."""
     breaks = find_breaks(level)
+    unpaused = find_changes(shares) + (find_beat_starts(beat) if beat is not None else [])
     changes = [
-        c for c in find_changes(shares)
+        c for c in unpaused
         if not any(b.kind == "break" and b.start - 3.0 <= c.cut <= b.end + 3.0 for b in breaks)
     ]
     candidates = sorted(breaks + changes, key=lambda c: c.cut)
@@ -756,6 +842,7 @@ def split_from_features(titles, level, chroma, shares, duration: float,
     reason = {
         "lull": "level only sags here, no clear pause",
         "change": "no pause here, placed where the sound changes",
+        "beat": "no pause here, placed where a steady beat sets in",
     }
     for i, cand in enumerate(chosen):
         if cand.kind in reason:
