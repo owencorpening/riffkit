@@ -42,22 +42,47 @@ _SETLIST_HEADER_RE = re.compile(r"^(set\s?list|songs)\b.*:\s*$", re.IGNORECASE)
 _NUMBERED_LINE_RE = re.compile(r"^\s*(\d+)\s*[\).\-:]\s*(\S.*)$")
 
 
+_SKIP_LINE_RE = re.compile(r"^\s*(?:[-*]\s*)?(\(.+\))\s*$")
+
+
+def is_skip_entry(title: str) -> bool:
+    """A setlist entry written wholly in parentheses, such as "(solo)".
+
+    It marks music that sits between songs but is not one of them. Setlist
+    mode finds where it starts and ends like any song, then writes no file.
+    """
+    title = title.strip()
+    return title.startswith("(") and title.endswith(")")
+
+
 def parse_setlist(setlist_file: Path) -> list[str]:
-    """Return the song titles, in order, from a setlist text file.
+    """Return the setlist entries, in order, from a setlist text file.
 
     Accepted layouts:
       * numbered lines ("1. Spanish Castle Magic") anywhere in the file
       * plain titles, one per line, after a "Setlist:" / "Songs:" header line
       * plain titles, one per line, with no header at all
 
+    A line wholly in parentheses, such as "(solo)", is a skip entry (see
+    is_skip_entry) and is kept in its place whichever layout is used.
+
     Lines such as "Date:", "Venue:" and "Source:" are ignored, and so is any
     free text above a setlist header (for example the concert name).
     """
     lines = Path(setlist_file).read_text(encoding="utf-8").splitlines()
 
-    numbered = [m.group(2).strip() for m in map(_NUMBERED_LINE_RE.match, lines) if m]
-    if numbered:
-        return numbered
+    ordered: list[str] = []
+    numbered_found = False
+    for line in lines:
+        numbered = _NUMBERED_LINE_RE.match(line)
+        skip = _SKIP_LINE_RE.match(line)
+        if numbered:
+            numbered_found = True
+            ordered.append(numbered.group(2).strip())
+        elif skip:
+            ordered.append(skip.group(1).strip())
+    if numbered_found:
+        return ordered
 
     header_index = next(
         (i for i, line in enumerate(lines) if _SETLIST_HEADER_RE.match(line.strip())),
@@ -66,7 +91,7 @@ def parse_setlist(setlist_file: Path) -> list[str]:
     body = lines[header_index + 1 :] if header_index is not None else lines
     titles = []
     for raw in body:
-        line = raw.strip()
+        line = raw.strip().lstrip("-* ").strip() if _SKIP_LINE_RE.match(raw) else raw.strip()
         if not line or line.lower().startswith(_HEADER_PREFIXES):
             continue
         titles.append(line)
@@ -186,7 +211,9 @@ class Break:
                   "change"  no drop in level, but the tone balance shifts
     start / end   seconds, the whole stretch (a break is usually several dips
                   with applause, talk or tuning between them)
-    cut           where the song boundary goes if this candidate is chosen
+    cut           where the next song starts if this candidate is chosen
+    music_stop    where the song before it stops (the first dip of a break).
+                  None for a change: the two songs meet at the cut.
     score         0..1, how convincing it is on its own
     """
 
@@ -197,6 +224,11 @@ class Break:
     cut: float = 0.0
     score: float = 0.0
     kind: str = "break"
+    music_stop: float | None = None
+
+    def stop(self) -> float:
+        """Where the song before this candidate ends."""
+        return self.cut if self.music_stop is None else min(self.music_stop, self.cut)
 
 
 def _dips(smoothed, reference: float, drop_db: float, hop_seconds: float,
@@ -230,7 +262,7 @@ def find_breaks(
     lull_drop_db: float = 5.0,
     min_quiet_seconds: float = 2.0,
     island_seconds: float = 15.0,
-    preroll_seconds: float = 3.0,
+    preroll_seconds: float = 4.5,
     reset_margin_db: float = 3.0,
     flourish_seconds: float = 5.0,
     flourish_margin_db: float = 3.0,
@@ -245,9 +277,10 @@ def find_breaks(
 
     Inside a break, the cut goes at the deepest dip, which is where the stage
     actually falls quiet before the next song. If several dips are within
-    ``reset_margin_db`` of the deepest, the last of them is used. The cut is
-    placed ``preroll_seconds`` before that dip ends so a count-in or pickup
-    is not clipped, but never before the dip starts.
+    ``reset_margin_db`` of the deepest, the last of them is used. The next
+    song starts ``preroll_seconds`` before that dip ends, so a count-in or
+    pickup is not clipped, but never before the break itself starts. The
+    song before it stops where the break's first dip begins.
 
     One exception: if the band comes back at full volume for at least
     ``flourish_seconds`` and then stops again, that was the end of the song
@@ -274,12 +307,14 @@ def find_breaks(
             # on each side, is the last flourish of the song that is ending.
             # Only dips after the last such burst can start the next song.
             live = dips
+            floor = dips[0][0]
             for i in range(len(dips) - 1):
                 a = int(round(dips[i][1] / hop_seconds))
                 b = int(round(dips[i + 1][0] / hop_seconds))
                 if (b - a) * hop_seconds >= flourish_seconds and \
                         float(smoothed[a:b].mean()) >= reference - flourish_margin_db:
                     live = dips[i + 1:]
+                    floor = dips[i][1]
             deepest = max(d for _, _, d in live)
             reset = [dip for dip in live if dip[2] >= deepest - reset_margin_db][-1]
             brk = Break(
@@ -287,8 +322,9 @@ def find_breaks(
                 end=dips[-1][1],
                 depth_db=deepest,
                 quiet_seconds=quiet_seconds,
-                cut=max(reset[0], reset[1] - preroll_seconds),
+                cut=max(floor, reset[1] - preroll_seconds),
                 kind=kind,
+                music_stop=dips[0][0],
             )
             brk.score = scale * break_score(brk)
             out.append(brk)
@@ -451,15 +487,40 @@ def load_transcript(transcript_file: Path) -> dict:
 
 @dataclass
 class SetlistSplit:
+    """The result: a start and an end for every setlist entry.
+
+    ``titles`` includes skip entries; ``segments()`` leaves them out.
+    ``checks[i]`` lists reasons to listen to entry i's boundaries by ear.
+    """
+
     titles: list[str]
-    starts: list[float]            # start of each song, seconds
-    end: float                     # end of the last song, seconds
+    starts: list[float]
+    ends: list[float] = field(default_factory=list)
+    checks: list[list[str]] = field(default_factory=list)
     candidates: list[Break] = field(default_factory=list)
     anchors: list[Anchor] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
+    end: float | None = None       # end of the last entry (kept for callers that only need this)
+
+    def __post_init__(self):
+        if not self.ends:
+            last = self.end if self.end is not None else (self.starts[-1] if self.starts else 0.0)
+            self.ends = list(self.starts[1:]) + [last]
+        if self.end is None:
+            self.end = self.ends[-1]
+        if not self.checks:
+            self.checks = [[] for _ in self.titles]
 
     def cues(self) -> list[tuple[float, str]]:
-        return list(zip(self.starts, self.titles))
+        return [(start, title) for start, title in zip(self.starts, self.titles) if not is_skip_entry(title)]
+
+    def segments(self) -> list[tuple[float, float, str]]:
+        """(start, end, title) for every real song, in order."""
+        return [
+            (start, end, title)
+            for start, end, title in zip(self.starts, self.ends, self.titles)
+            if not is_skip_entry(title)
+        ]
 
 
 class _Sameness:
@@ -535,7 +596,9 @@ def choose_boundaries(
     min_song_seconds: float = 60.0,
     anchor_weight: float = 1.0,
     sameness_weight: float = 0.3,
-) -> list[float] | None:
+    min_lengths: list[float] | None = None,
+    return_candidates: bool = False,
+):
     """Pick ``song_count - 1`` cuts, in order, from ``candidates``.
 
     Maximises
@@ -543,14 +606,17 @@ def choose_boundaries(
       + anchor_weight   * weight of anchors that land inside their own song
       - sameness_weight * how unlike itself each resulting song is
 
-    Returns the chosen cut times, or None if there are not enough candidates
-    to give every song at least ``min_song_seconds``.
+    Returns the chosen cut times (or the chosen candidates themselves with
+    ``return_candidates``), or None if there are not enough candidates to give
+    every entry its minimum length: ``min_lengths[i]`` if given, otherwise
+    ``min_song_seconds``.
     """
     needed = song_count - 1
     if needed <= 0:
         return []
+    shortest = list(min_lengths) if min_lengths else [min_song_seconds] * song_count
     cands = sorted(
-        (c for c in candidates if first_start + min_song_seconds <= c.cut <= end_time - min_song_seconds),
+        (c for c in candidates if first_start + shortest[0] <= c.cut <= end_time - shortest[-1]),
         key=lambda c: c.cut,
     )
     if len(cands) < needed:
@@ -581,7 +647,7 @@ def choose_boundaries(
             for prev in range(j - 1, c):
                 if best[j - 1][prev] == NEG:
                     continue
-                if cands[c].cut - cands[prev].cut < min_song_seconds:
+                if cands[c].cut - cands[prev].cut < shortest[j]:
                     continue
                 value = best[j - 1][prev] + cands[c].score + song_value(j, cands[prev].cut, cands[c].cut)
                 if value > best[j][c]:
@@ -601,9 +667,10 @@ def choose_boundaries(
     chosen = []
     c = final_c
     for j in range(needed - 1, -1, -1):
-        chosen.append(cands[c].cut)
+        chosen.append(cands[c])
         c = back[j][c]
-    return chosen[::-1]
+    chosen.reverse()
+    return chosen if return_candidates else [cand.cut for cand in chosen]
 
 
 def show_limits(level_db, duration: float, hop_seconds: float = LEVEL_HOP_SECONDS,
@@ -655,6 +722,9 @@ def detect_setlist_boundaries(
     return split_from_features(titles, level, chroma, shares, duration, transcript, min_song_seconds)
 
 
+SKIP_MIN_SECONDS = 20.0
+
+
 def split_from_features(titles, level, chroma, shares, duration: float,
                         transcript: dict | None = None,
                         min_song_seconds: float = 60.0) -> SetlistSplit:
@@ -668,26 +738,36 @@ def split_from_features(titles, level, chroma, shares, duration: float,
     anchors = announce_anchors(find_anchors(titles, transcript), candidates) if transcript else []
 
     first_start, end_time = show_limits(level, duration)
-    cuts = choose_boundaries(
+    min_lengths = [SKIP_MIN_SECONDS if is_skip_entry(t) else min_song_seconds for t in titles]
+    chosen = choose_boundaries(
         candidates, anchors, len(titles), first_start, end_time,
-        chroma=chroma, quiet=quiet_seconds_mask(level), min_song_seconds=min_song_seconds,
+        chroma=chroma, quiet=quiet_seconds_mask(level),
+        min_lengths=min_lengths, return_candidates=True,
     )
-    if cuts is None:
+    if chosen is None:
         raise RuntimeError(
             f"Setlist mode found only {len(candidates)} possible boundaries for "
-            f"{len(titles)} songs. It cannot place every boundary."
+            f"{len(titles)} setlist entries. It cannot place every boundary."
         )
+
+    starts = [first_start] + [cand.cut for cand in chosen]
+    ends = [cand.stop() for cand in chosen] + [end_time]
+    checks: list[list[str]] = [[] for _ in titles]
+    reason = {
+        "lull": "level only sags here, no clear pause",
+        "change": "no pause here, placed where the sound changes",
+    }
+    for i, cand in enumerate(chosen):
+        if cand.kind in reason:
+            checks[i].append(f"end: {reason[cand.kind]}")
+            checks[i + 1].append(f"start: {reason[cand.kind]}")
 
     notes = []
     if not transcript:
         notes.append("No transcript given: song order is not checked against the words.")
     return SetlistSplit(
-        titles=list(titles),
-        starts=[first_start] + cuts,
-        end=end_time,
-        candidates=candidates,
-        anchors=anchors,
-        notes=notes,
+        titles=list(titles), starts=starts, ends=ends, checks=checks,
+        candidates=candidates, anchors=anchors, notes=notes, end=end_time,
     )
 
 
@@ -702,8 +782,64 @@ def format_time(seconds: float) -> str:
 
 
 def format_boundaries(split: SetlistSplit) -> str:
-    lines = ["#   Start     Song"]
-    for i, (start, title) in enumerate(split.cues(), start=1):
-        lines.append(f"{i:<3} {format_time(start):<9} {title}")
-    lines.append(f"End {format_time(split.end):<9} (end of last song)")
+    """The boundaries list, in the same layout as a hand-marked boundaries.txt.
+
+    Check column: "ok", or "CHECK" for a boundary worth listening to. Skip
+    entries are listed with "-" in place of a number and get no file. This
+    text can be edited and passed back with --boundaries to re-export.
+    """
+    lines = ["#   Start     End       Check  Song"]
+    reasons = []
+    number = 0
+    for title, start, end, why in zip(split.titles, split.starts, split.ends, split.checks):
+        if is_skip_entry(title):
+            label = "-"
+        else:
+            number += 1
+            label = str(number)
+        flag = "CHECK" if why else "ok"
+        lines.append(f"{label:<3} {format_time(start):<9} {format_time(end):<9} {flag:<6} {title}")
+        for item in why:
+            reasons.append(f"  {title}: {item}")
+    if reasons:
+        lines.append("")
+        lines.append("Listen to these:")
+        lines.extend(reasons)
     return "\n".join(lines)
+
+
+_BOUNDARY_LINE_RE = re.compile(
+    r"^\s*(\d+)\s+(\d+(?::\d+){1,2}(?:\.\d+)?)\s+(\d+(?::\d+){1,2}(?:\.\d+)?)\s+(.*\S)\s*$"
+)
+_FLAG_WORDS = {"ok", "check", "y", "n", "-", "_", "?"}
+
+
+def _clock_to_seconds(text: str) -> float:
+    seconds = 0.0
+    for part in text.split(":"):
+        seconds = seconds * 60.0 + float(part)
+    return seconds
+
+
+def read_boundaries_file(boundaries_file: Path) -> list[tuple[float, float, str]]:
+    """Read (start, end, title) for each numbered song in a boundaries file.
+
+    Works on the list setlist mode prints and on a hand-marked answer key:
+    "<number> <start> <end> [one flag word] <title>". Lines without a number
+    (headers, notes, skip entries marked "-") are ignored.
+    """
+    segments = []
+    for line in Path(boundaries_file).read_text(encoding="utf-8").splitlines():
+        match = _BOUNDARY_LINE_RE.match(line)
+        if not match:
+            continue
+        start = _clock_to_seconds(match.group(2))
+        end = _clock_to_seconds(match.group(3))
+        rest = match.group(4).split(None, 1)
+        if len(rest) == 2 and rest[0].lower() in _FLAG_WORDS:
+            title = rest[1].strip()
+        else:
+            title = match.group(4).strip()
+        if end > start:
+            segments.append((start, end, title))
+    return segments

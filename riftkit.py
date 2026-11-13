@@ -9,6 +9,7 @@ Usage:
     ./riftkit.py <concert.mp3> --split-concert
     ./riftkit.py <concert.mp3> --split-concert --setlist-mode \
         --song-list setlist.txt --transcript whisper.json
+    ./riftkit.py <concert.mp3> --split-concert --boundaries boundaries.txt
 
 Steps:
     1. Separate stems with Demucs (vocals, drums, bass, other)
@@ -338,15 +339,27 @@ def split_concert_into_songs(
     song_cues: list[tuple[float, str]] | None = None,
     song_titles: list[str] | None = None,
     end_time: float | None = None,
+    song_segments: list[tuple[float, float, str]] | None = None,
 ) -> Path:
     """Split a concert file into numbered song files using silence gaps.
 
     ``end_time`` only applies when ``song_cues`` are given: the last song
     stops there instead of running to the end of the file.
+
+    ``song_segments`` gives (start, end, title) for each song outright. Used
+    as given, so songs need not be back to back: whatever lies between one
+    song's end and the next song's start is left out.
     """
     duration = probe_duration(audio_file)
     cue_limit = min(duration, end_time) if end_time else duration
-    cue_segments = build_song_segments_from_cues(cue_limit, song_cues or [])
+    if song_segments:
+        cue_segments = [
+            (max(0.0, start), min(duration, end), title)
+            for start, end, title in song_segments
+            if min(duration, end) - max(0.0, start) > 1.0
+        ]
+    else:
+        cue_segments = build_song_segments_from_cues(cue_limit, song_cues or [])
     if cue_segments:
         segments = cue_segments
         use_cues = True
@@ -416,7 +429,7 @@ def split_concert_by_setlist(
     if not song_list_file.exists():
         raise RuntimeError(f"Setlist mode needs a setlist file; not found: {song_list_file}")
     titles = setlist_split.parse_setlist(song_list_file)
-    if len(titles) < 2:
+    if sum(1 for title in titles if not setlist_split.is_skip_entry(title)) < 2:
         raise RuntimeError(f"Setlist mode needs at least two song titles in {song_list_file}")
 
     transcript = None
@@ -432,7 +445,9 @@ def split_concert_by_setlist(
             "  See docs/sops/local-transcription.md to make one."
         )
 
-    print(f"Setlist mode: {len(titles)} songs from {song_list_file}")
+    skips = sum(1 for title in titles if setlist_split.is_skip_entry(title))
+    skip_note = f" (+{skips} skip entries, no file written)" if skips else ""
+    print(f"Setlist mode: {len(titles) - skips} songs{skip_note} from {song_list_file}")
     split = setlist_split.detect_setlist_boundaries(audio_file, titles, transcript)
     boundaries_text = setlist_split.format_boundaries(split)
     print("\nBoundaries:")
@@ -444,11 +459,28 @@ def split_concert_by_setlist(
     split_dir = split_concert_into_songs(
         audio_file,
         output_dir,
-        song_cues=split.cues(),
-        end_time=split.end,
+        song_segments=split.segments(),
     )
     (split_dir / "boundaries.txt").write_text(boundaries_text + "\n", encoding="utf-8")
+    print(f"\nTo change a time: edit {split_dir / 'boundaries.txt'} and rerun with\n"
+          f"  --split-concert --boundaries <that file>")
     return split_dir
+
+
+def split_concert_by_boundaries(audio_file: Path, output_dir: Path, boundaries_file: Path) -> Path:
+    """Export song files straight from a boundaries file. No detection is run."""
+    import setlist_split
+
+    if not boundaries_file.exists():
+        raise RuntimeError(f"Boundaries file not found: {boundaries_file}")
+    segments = setlist_split.read_boundaries_file(boundaries_file)
+    if not segments:
+        raise RuntimeError(
+            f"No song lines found in {boundaries_file}. Expected lines like: "
+            "'1   0:17.7    5:21.7    ok     Song Title'"
+        )
+    print(f"Exporting {len(segments)} songs from {boundaries_file} (no detection)")
+    return split_concert_into_songs(audio_file, output_dir, song_segments=segments)
 
 
 def main():
@@ -490,6 +522,11 @@ def main():
              "song from the audio itself, instead of relying on silent gaps",
     )
     parser.add_argument(
+        "--boundaries",
+        help="With --split-concert: export songs straight from a boundaries file "
+             "(start and end per song), without running any detection",
+    )
+    parser.add_argument(
         "--transcript",
         help="Whisper JSON transcript of the concert (word timestamps), used by "
              "--setlist-mode to keep each title on the right song",
@@ -510,6 +547,11 @@ def main():
 
     if args.split_concert:
         song_list_file = Path(args.song_list).expanduser().resolve() if args.song_list else audio_file.with_suffix(".txt")
+        if args.boundaries:
+            split_concert_by_boundaries(
+                audio_file, output_dir, Path(args.boundaries).expanduser().resolve()
+            )
+            return
         if args.setlist_mode:
             split_concert_by_setlist(
                 audio_file,
