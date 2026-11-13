@@ -1,22 +1,21 @@
 ANSWER KEY - Hendrix, Gothenburg 1970-09-01
-Fill in by ear. Times are where each song STARTS in the audio file (mm:ss or h:mm:ss).
+Marked by ear. Start/End are where each song starts and ends in the audio file (mm:ss.s, minutes count past 59).
 Gap? = was there a real pause before this song?  Y = clean break, N = runs straight in (gapless)
 
-#   Start     Gap?  Song
-1   0:17.7    N     Spanish Castle Magic
-2   5:36.0    Y     Killing Floor
-3   10:22.0   Y     Hear My Train A-Comin'
-4   23:44.0   Y     Message To Love
-5   32:23.9   N     Hey Baby
-6   41:04.0   Y     In From The Storm
-7   45:08.7   Y     Hey Joe
-8   50:11.8   Y     Foxy Lady
-9   55:54.2   Y     Red House
-10  65:58.1   Y     Room Full Of Mirrors
-11  69:20.0   Y     Straight Ahead
-12  74:34.3   Y     Purple Haze
-13  77:53.6   Y     Voodoo Child (Slight Return)
-End 89:31.4         (end of last song / applause)
+#   Start     End       Gap?  Song
+1   1:23.0    5:21.7    N     Spanish Castle Magic
+2   5:36.0    9:58.6    Y     Killing Floor
+3   10:22.0   23:07.5   Y     Hear My Train A-Comin'
+4   23:44.0   32:21.9   Y     Message To Love
+5   35:47.0   40:48.0   N     Hey Baby
+6   41:04.0   44:56.0   Y     In From The Storm
+7   45:08.8   49:48.1   Y     Hey Joe
+8   50:11.8   55:20.0   Y     Foxy Lady
+9   55:54.3   65:54.1   Y     Red House
+10  65:58.1   69:04.0   Y     Room Full Of Mirrors
+11  69:44.0   74:24.0   Y     Straight Ahead
+12  74:34.4   77:36.0   Y     Purple Haze
+13  77:53.7   89:31.4   Y     Voodoo Child (Slight Return)
 
 Notes (anything odd: false starts, tuning, jams that blend songs, stage talk):
 
