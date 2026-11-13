@@ -6,7 +6,7 @@ Gap? = was there a real pause before this song?  Y = clean break, N = runs strai
 1   1:23.0    5:21.7    N     Spanish Castle Magic
 2   5:36.0    9:58.6    Y     Killing Floor
 3   10:22.0   23:07.5   Y     Hear My Train A-Comin'
-4   23:44.0   32:21.9   Y     Message To Love
+4   23:44.0   32:16.0   Y     Message To Love
 5   35:47.0   40:48.0   N     Hey Baby
 6   41:04.0   44:56.0   Y     In From The Storm
 7   45:08.8   49:48.1   Y     Hey Joe
