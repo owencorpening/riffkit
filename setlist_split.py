@@ -55,7 +55,29 @@ def is_skip_entry(title: str) -> bool:
     return title.startswith("(") and title.endswith(")")
 
 
+def split_hints(entry: str) -> tuple[str, list[str]]:
+    """Split "Title | hint, another hint" into the title and its hints.
+
+    A hint is a word or short phrase you know is sung in that song. It gives
+    setlist mode something to listen for when the title itself is never sung
+    clearly.
+    """
+    title, _, rest = entry.partition("|")
+    hints = [hint.strip() for hint in rest.split(",") if hint.strip()]
+    return title.strip(), hints
+
+
+def parse_setlist_hints(setlist_file: Path) -> list[list[str]]:
+    """The hints for each setlist entry, in the same order as parse_setlist."""
+    return [split_hints(entry)[1] for entry in _setlist_entries(setlist_file)]
+
+
 def parse_setlist(setlist_file: Path) -> list[str]:
+    """Return the setlist titles, in order, from a setlist text file."""
+    return [split_hints(entry)[0] for entry in _setlist_entries(setlist_file)]
+
+
+def _setlist_entries(setlist_file: Path) -> list[str]:
     """Return the setlist entries, in order, from a setlist text file.
 
     Accepted layouts:
@@ -65,6 +87,8 @@ def parse_setlist(setlist_file: Path) -> list[str]:
 
     A line wholly in parentheses, such as "(solo)", is a skip entry (see
     is_skip_entry) and is kept in its place whichever layout is used.
+
+    Anything after a "|" on a song line is a list of hints (see split_hints).
 
     Lines such as "Date:", "Venue:" and "Source:" are ignored, and so is any
     free text above a setlist header (for example the concert name).
@@ -507,52 +531,60 @@ def transcript_words(transcript: dict) -> list[tuple[float, str]]:
     return words
 
 
-def find_anchors(titles: list[str], transcript: dict, max_word_gap_seconds: float = 4.0) -> list[Anchor]:
-    """Find places in the transcript where a setlist title is sung or said.
+HINT_WEIGHT = 0.7
 
-    A full title in order ("room full of mirrors") is the strongest evidence.
-    A single word counts only if it is distinctive: not a common word and not
-    shared with another title in the setlist.
-    """
-    words = transcript_words(transcript)
-    title_tokens = [_tokens(title) for title in titles]
 
-    token_owner_count: dict[str, int] = {}
-    for toks in title_tokens:
-        for tok in set(toks):
-            token_owner_count[tok] = token_owner_count.get(tok, 0) + 1
-
-    anchors: list[Anchor] = []
-    for song_index, toks in enumerate(title_tokens):
-        if not toks:
-            continue
-        distinctive = {
-            tok for tok in toks
-            if tok not in _STOPWORDS and len(tok) > 3 and token_owner_count[tok] == 1
-        }
-        n = len(toks)
-        i = 0
-        while i < len(words):
-            # Longest in-order run of the title starting at word i.
-            matched = 0
-            if words[i][1] == toks[0]:
-                matched = 1
-                last_time = words[i][0]
-                while (
-                    matched < n
-                    and i + matched < len(words)
-                    and words[i + matched][1] == toks[matched]
-                    and words[i + matched][0] - last_time <= max_word_gap_seconds
-                ):
-                    last_time = words[i + matched][0]
-                    matched += 1
-            if matched == n and n >= 2:
-                anchors.append(Anchor(song_index, words[i][0], 1.0, " ".join(toks)))
+def _phrase_hits(words: list[tuple[float, str]], phrase: list[str], max_word_gap_seconds: float) -> list[float]:
+    """Start times of every place ``phrase`` occurs, in order, in ``words``."""
+    hits = []
+    n = len(phrase)
+    i = 0
+    while i < len(words):
+        if words[i][1] == phrase[0]:
+            matched = 1
+            last_time = words[i][0]
+            while (
+                matched < n
+                and i + matched < len(words)
+                and words[i + matched][1] == phrase[matched]
+                and words[i + matched][0] - last_time <= max_word_gap_seconds
+            ):
+                last_time = words[i + matched][0]
+                matched += 1
+            if matched == n:
+                hits.append(words[i][0])
                 i += matched
                 continue
-            if words[i][1] in distinctive:
-                anchors.append(Anchor(song_index, words[i][0], 0.4, words[i][1]))
-            i += 1
+        i += 1
+    return hits
+
+
+def find_anchors(titles: list[str], transcript: dict, hints: list[list[str]] | None = None,
+                 max_word_gap_seconds: float = 4.0) -> list[Anchor]:
+    """Find places in the transcript where a song is identified.
+
+    Two things count:
+      * the full title, in order ("room full of mirrors"). Titles of a single
+        word count only when that word is not an everyday one.
+      * a hint given for that song in the setlist ("Title | hint").
+
+    Single words taken from a longer title do not count. Whisper mishears
+    live vocals often enough that a stray "ahead" or "child" is as likely to
+    be a mistake as a title, and one such mistake can move several songs.
+    """
+    words = transcript_words(transcript)
+    anchors: list[Anchor] = []
+    for song_index, title in enumerate(titles):
+        toks = _tokens(title)
+        if len(toks) >= 2 or (len(toks) == 1 and toks[0] not in _STOPWORDS and len(toks[0]) > 3):
+            for time in _phrase_hits(words, toks, max_word_gap_seconds):
+                anchors.append(Anchor(song_index, time, 1.0, " ".join(toks)))
+        for hint in (hints[song_index] if hints and song_index < len(hints) else []):
+            phrase = _tokens(hint)
+            if not phrase:
+                continue
+            for time in _phrase_hits(words, phrase, max_word_gap_seconds):
+                anchors.append(Anchor(song_index, time, HINT_WEIGHT, " ".join(phrase)))
     anchors.sort(key=lambda a: a.time)
     return anchors
 
@@ -793,6 +825,7 @@ def detect_setlist_boundaries(
     titles: list[str],
     transcript: dict | None = None,
     min_song_seconds: float = 60.0,
+    hints: list[list[str]] | None = None,
 ) -> SetlistSplit:
     """Find the start of every song in ``titles`` inside ``audio_file``."""
     if len(titles) < 1:
@@ -803,7 +836,8 @@ def detect_setlist_boundaries(
     level = level_curve(samples)
     chroma, shares = tone_features(samples)
     beat = beat_strength(samples)
-    return split_from_features(titles, level, chroma, shares, duration, transcript, min_song_seconds, beat=beat)
+    return split_from_features(titles, level, chroma, shares, duration, transcript, min_song_seconds,
+                               beat=beat, hints=hints)
 
 
 SKIP_MIN_SECONDS = 20.0
@@ -812,7 +846,7 @@ SKIP_MIN_SECONDS = 20.0
 def split_from_features(titles, level, chroma, shares, duration: float,
                         transcript: dict | None = None,
                         min_song_seconds: float = 60.0,
-                        beat=None) -> SetlistSplit:
+                        beat=None, hints: list[list[str]] | None = None) -> SetlistSplit:
     """The decision step, separated from audio decoding so it can be tested."""
     breaks = find_breaks(level)
     unpaused = find_changes(shares) + (find_beat_starts(beat) if beat is not None else [])
@@ -821,7 +855,7 @@ def split_from_features(titles, level, chroma, shares, duration: float,
         if not any(b.kind == "break" and b.start - 3.0 <= c.cut <= b.end + 3.0 for b in breaks)
     ]
     candidates = sorted(breaks + changes, key=lambda c: c.cut)
-    anchors = announce_anchors(find_anchors(titles, transcript), candidates) if transcript else []
+    anchors = announce_anchors(find_anchors(titles, transcript, hints), candidates) if transcript else []
 
     first_start, end_time = show_limits(level, duration)
     min_lengths = [SKIP_MIN_SECONDS if is_skip_entry(t) else min_song_seconds for t in titles]
@@ -852,6 +886,12 @@ def split_from_features(titles, level, chroma, shares, duration: float,
     notes = []
     if not transcript:
         notes.append("No transcript given: song order is not checked against the words.")
+    else:
+        for i, title in enumerate(titles):
+            if is_skip_entry(title):
+                continue
+            if not any(a.song_index == i and starts[i] <= a.time < ends[i] for a in anchors):
+                checks[i].append("title not heard in the transcript; add a hint to the setlist to confirm it")
     return SetlistSplit(
         titles=list(titles), starts=starts, ends=ends, checks=checks,
         candidates=candidates, anchors=anchors, notes=notes, end=end_time,

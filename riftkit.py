@@ -429,6 +429,7 @@ def split_concert_by_setlist(
     if not song_list_file.exists():
         raise RuntimeError(f"Setlist mode needs a setlist file; not found: {song_list_file}")
     titles = setlist_split.parse_setlist(song_list_file)
+    hints = setlist_split.parse_setlist_hints(song_list_file)
     if sum(1 for title in titles if not setlist_split.is_skip_entry(title)) < 2:
         raise RuntimeError(f"Setlist mode needs at least two song titles in {song_list_file}")
 
@@ -448,7 +449,7 @@ def split_concert_by_setlist(
     skips = sum(1 for title in titles if setlist_split.is_skip_entry(title))
     skip_note = f" (+{skips} skip entries, no file written)" if skips else ""
     print(f"Setlist mode: {len(titles) - skips} songs{skip_note} from {song_list_file}")
-    split = setlist_split.detect_setlist_boundaries(audio_file, titles, transcript)
+    split = setlist_split.detect_setlist_boundaries(audio_file, titles, transcript, hints=hints)
     boundaries_text = setlist_split.format_boundaries(split)
     print("\nBoundaries:")
     print(boundaries_text)
