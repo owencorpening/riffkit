@@ -139,12 +139,63 @@ def test_find_anchors_matches_full_title():
     assert full == [(0, 1.0), (1, 1.0)]
 
 
-def test_find_anchors_single_word_must_be_distinctive():
+def test_find_anchors_ignores_single_words_from_longer_titles():
+    # "go ahead" is not Straight Ahead, and "beauty child" is not Voodoo Child
     anchors = ss.find_anchors(
-        ["Hey Baby", "Hey Joe", "Foxy Lady"],
-        _transcript((5, 8, "hey hey hey"), (50, 52, "you foxy thing")),
+        ["Straight Ahead", "Voodoo Child (Slight Return)", "Foxy Lady"],
+        _transcript((5, 8, "go ahead, go ahead"), (50, 52, "beauty child"), (90, 92, "you foxy thing")),
     )
-    assert [(a.song_index, a.text) for a in anchors] == [(2, "foxy")]
+    assert anchors == []
+
+
+def test_find_anchors_counts_hints_for_their_song():
+    anchors = ss.find_anchors(
+        ["Straight Ahead", "Hear My Train A-Comin'"],
+        _transcript((5, 8, "go ahead"), (700, 705, "waiting for the train")),
+        hints=[[], ["train"]],
+    )
+    assert [(a.song_index, a.text, a.weight) for a in anchors] == [(1, "train", ss.HINT_WEIGHT)]
+
+
+def test_find_anchors_matches_a_hint_phrase_in_order():
+    anchors = ss.find_anchors(
+        ["Some Song"],
+        _transcript((5, 9, "over the hills and far away"), (50, 52, "far and over")),
+        hints=[["far away"]],
+    )
+    assert len(anchors) == 1
+    assert 5 <= anchors[0].time <= 9
+
+
+def test_parse_setlist_separates_hints_from_titles(tmp_path):
+    f = tmp_path / "setlist.txt"
+    f.write_text("1. First Song | first hint, second hint\n(solo)\n2. Second Song\n")
+    assert ss.parse_setlist(f) == ["First Song", "(solo)", "Second Song"]
+    assert ss.parse_setlist_hints(f) == [["first hint", "second hint"], [], []]
+
+
+def test_both_gothenburg_transcripts_identify_the_same_songs():
+    # The original Whisper run and the faster-whisper run mishear different
+    # words. Neither mishearing may count as a title.
+    titles = ss.parse_setlist(GOTHENBURG / "setlist.txt")
+    hints = ss.parse_setlist_hints(GOTHENBURG / "setlist.txt")
+    wanted = {"Message To Love", "Hey Baby", "Foxy Lady", "Room Full Of Mirrors", "Hear My Train A-Comin'"}
+    for name in ("whisper_small.json", "faster_whisper_small.json"):
+        transcript = ss.load_transcript(GOTHENBURG / name)
+        found = {titles[a.song_index] for a in ss.find_anchors(titles, transcript, hints)}
+        assert wanted <= found, name
+        assert "Straight Ahead" not in found, name
+        assert "Voodoo Child (Slight Return)" not in found, name
+
+
+def test_song_with_no_title_evidence_is_marked_for_checking():
+    level = _level((200, -10), (10, -40), (200, -10), (10, -40))
+    chroma = np.tile(np.eye(12)[0], (420, 1))
+    shares = np.tile([0.5, 0.2, 0.15, 0.1, 0.05], (420, 1))
+    transcript = _transcript((50, 54, "this is song one for you"))
+    split = ss.split_from_features(["Song One", "Song Two"], level, chroma, shares, 420.0, transcript)
+    assert split.checks[0] == []
+    assert any("title not heard" in why for why in split.checks[1])
 
 
 def test_find_anchors_uses_word_timestamps_when_present():
