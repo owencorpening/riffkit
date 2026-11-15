@@ -6,3 +6,6 @@ PyYAML>=6.0
 
 # Needed for --setlist-mode
 numpy>=1.24
+
+# Only needed for transcription (scripts/transcribe_concert.py)
+faster-whisper>=1.2

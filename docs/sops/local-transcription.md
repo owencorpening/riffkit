@@ -40,6 +40,23 @@ From the repo root:
 - If you want a different balance of speed and accuracy, change `--model` to `base`, `small`, `medium`, or another installed Whisper model.
 - Keep the JSON in your homedir workflow area so you can pick it up in REAPER later.
 
+## Whole-concert transcription (chunked)
+
+For a full concert recording, use the chunked faster-whisper script instead of the `whisper` command above:
+
+```bash
+.venv/bin/python scripts/transcribe_concert.py \
+  data/gothenburg-1970-09-01.mp3 \
+  /home/owen/whisper_runs/gothenburg.json \
+  --model small --chunk-minutes 10
+```
+
+- The audio must be chunked. Transcribing a whole concert in one pass runs this machine out of memory; the script decodes with `ffmpeg` and feeds the model 10-minute chunks, with timestamps offset back to absolute concert time.
+- It took 51 minutes for a 90-minute concert on this machine (`small` model, CPU).
+- The JSON is rewritten after every chunk, so an interrupted run keeps everything up to the last finished chunk.
+- Progress lines are printed as segments arrive; the run ends with `=== finished in N seconds ===`.
+- Needs `faster-whisper` (in `requirements.txt`, only used for transcription).
+
 ## Follow-up
 
 - Open REAPER.
