@@ -184,8 +184,13 @@ def test_both_gothenburg_transcripts_identify_the_same_songs():
         transcript = ss.load_transcript(GOTHENBURG / name)
         found = {titles[a.song_index] for a in ss.find_anchors(titles, transcript, hints)}
         assert wanted <= found, name
-        assert "Straight Ahead" not in found, name
-        assert "Voodoo Child (Slight Return)" not in found, name
+        # Without the setlist hints, the titles alone must not identify these
+        # two: "ahead" and "child" are heard, but never the full title.
+        by_title = {titles[a.song_index] for a in ss.find_anchors(titles, transcript)}
+        assert "Straight Ahead" not in by_title, name
+        assert "Voodoo Child (Slight Return)" not in by_title, name
+        # With the hints, both transcripts identify them.
+        assert {"Straight Ahead", "Voodoo Child (Slight Return)"} <= found, name
 
 
 def test_song_with_no_title_evidence_is_marked_for_checking():
