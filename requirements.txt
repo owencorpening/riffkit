@@ -7,5 +7,9 @@ PyYAML>=6.0
 # Needed for --setlist-mode
 numpy>=1.24
 
+# Needed for stem separation (the main riftkit command)
+demucs>=4.1
+torchcodec>=0.17
+
 # Only needed for transcription (scripts/transcribe_concert.py)
 faster-whisper>=1.2
