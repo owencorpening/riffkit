@@ -12,9 +12,9 @@ Usage:
     ./riftkit.py <concert.mp3> --split-concert --boundaries boundaries.txt
 
 Steps:
-    1. Separate stems with Demucs (vocals, drums, bass, other)
-    2. Transcribe vocals with Whisper          [TODO]
-    3. Copy REAPER template with stems folder  [TODO]
+    1. Separate stems with Demucs htdemucs_ft (vocals, drums, bass, other)
+    2. Write a REAPER project with the stems and the original on tracks
+    3. Transcribe vocals with Whisper          [TODO]
     4. Insert lyrics into REAPER project       [TODO]
 
 Requires:
@@ -34,7 +34,7 @@ from pathlib import Path
 
 
 TEMPLATE_RPP = Path(__file__).parent / "stem-separation" / "stem_template.RPP"
-DEMUCS_MODEL = "htdemucs"  # 4-stem model: vocals, drums, bass, other
+DEMUCS_MODEL = "htdemucs_ft"  # fine-tuned 4-stem model: vocals, drums, bass, other (about 4x slower than htdemucs)
 
 SILENCE_START_RE = re.compile(r"silence_start:\s*([0-9.]+)")
 SILENCE_END_RE = re.compile(
@@ -134,16 +134,20 @@ def parse_song_cues(song_list_file: Path) -> list[tuple[float, str]]:
     return cues
 
 
-def separate_stems(audio_file: Path, output_dir: Path) -> Path:
-    """Run Demucs on audio_file; return the folder containing the stem files."""
-    print(f"Separating stems: {audio_file.name}")
+def separate_stems(audio_file: Path, output_dir: Path, model: str = DEMUCS_MODEL) -> Path:
+    """Run Demucs on audio_file; return the folder containing the stem files.
+
+    Stems are written as WAV so nothing is lost between separation and REAPER.
+    """
+    print(f"Separating stems: {audio_file.name}  (model: {model})")
 
     result = subprocess.run(
         [
             sys.executable,
             "-m",
             "demucs",
-            "--mp3",
+            "-n",
+            model,
             "--out",
             str(output_dir),
             str(audio_file),
@@ -153,7 +157,7 @@ def separate_stems(audio_file: Path, output_dir: Path) -> Path:
     if result.returncode != 0:
         raise RuntimeError("Demucs failed — is it installed? pip install demucs")
 
-    stems_dir = output_dir / DEMUCS_MODEL / audio_file.stem
+    stems_dir = output_dir / model / audio_file.stem
     if not stems_dir.exists():
         raise FileNotFoundError(
             f"Expected stems at {stems_dir} but it was not created."
@@ -496,6 +500,12 @@ def main():
         "--no-lyrics", action="store_true", help="Skip lyrics transcription"
     )
     parser.add_argument(
+        "--stem-model",
+        default=DEMUCS_MODEL,
+        help=f"Demucs model for stem separation (default: {DEMUCS_MODEL}; "
+             "htdemucs is faster and rougher, htdemucs_6s adds guitar and piano)",
+    )
+    parser.add_argument(
         "--split-concert",
         action="store_true",
         help="Split a long concert recording into separate song files before processing",
@@ -578,26 +588,29 @@ def main():
         return
 
     # Step 1: Stem separation
-    stems_dir = separate_stems(audio_file, output_dir)
+    stems_dir = separate_stems(audio_file, output_dir, model=args.stem_model)
 
-    # Step 2: Copy REAPER template alongside stems
-    rpp_path = copy_template(stems_dir)
+    # Step 2: Write a REAPER project with the stems and the original on tracks
+    import reaper_project
+
+    rpp_path = stems_dir / f"{audio_file.stem}.RPP"
+    reaper_project.write_reaper_project(rpp_path, stems_dir, original=audio_file)
+    print(f"  Project → {rpp_path}")
 
     # Step 3: Lyrics transcription (manual for now)
     if not args.no_lyrics:
         print("\n[TODO] Lyrics transcription is not wired into this pipeline yet.")
         print("       Run lyrics-sync/transcribe_adaptive.py on the vocals stem:")
         print(f"       .venv/bin/python lyrics-sync/transcribe_adaptive.py "
-              f"'{stems_dir}/vocals.mp3'")
+              f"'{stems_dir}/vocals.wav'")
 
     print(f"""
 Done!
   Stems:    {stems_dir}
-  Template: {rpp_path}
+  Project:  {rpp_path}
 
-Next steps:
-  1. Open {rpp_path.name} in REAPER
-  2. Run Actions > import_stems.lua and select any file in the stems folder
+Open {rpp_path.name} in REAPER. The four stems are on their tracks and the
+original mix is on a muted fifth track.
 """)
 
 

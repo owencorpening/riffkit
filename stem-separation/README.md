@@ -24,7 +24,7 @@ This component acts as a **workflow wrapper** around powerful external AI models
 | Step | Action | Required Tool/Dependency | Output |
 | :--- | :--- | :--- | :--- |
 | **Step 1: Stemming** | Run your audio file through Demucs. | **Demucs** (`pip install demucs`) | 4 WAV files: `vocals.wav`, `drums.wav`, `bass.wav`, `other.wav` |
-| **Step 2: Project Creation** | Use the custom template and/or script. | **`riffkit/stem-separation/stem_template.RPP`** | A REAPER project with all stems aligned and grouped. |
+| **Step 2: Project Creation** | riffkit writes a `.RPP` with the stems on named tracks. | **`riffkit/reaper_project.py`** | A REAPER project: Vocals, Drums, Bass, Other, plus the original mix muted. |
 
 #### External Dependencies: Demucs
 
@@ -42,25 +42,27 @@ pip install demucs
 
 #### Option A: Automated (recommended)
 
-Run `riftkit.py` from the repo root — it separates the stems and drops the template next to them:
+Run `riftkit.py` from the repo root. It separates the stems (model
+`htdemucs_ft`, WAV output) and writes a project file next to them:
 
 ```bash
 ./riftkit.py song.mp3 --output ~/music/projects
 ```
 
-Then open the generated `stem_template.RPP` in REAPER and skip to Step 3 below.
+Open `~/music/projects/htdemucs_ft/song/song.RPP` in REAPER. The four stems
+are on their tracks and the original song is on a muted fifth track, so
+you can switch between the mix and the parts. Nothing to import.
+
+Other models: `--stem-model htdemucs` is about four times faster and
+rougher; `--stem-model htdemucs_6s` adds guitar and piano stems.
 
 #### Option B: Manual
 
-1.  Run `demucs song.mp3` directly. Stems land in `separated/htdemucs/song/`.
-2.  Copy **`stem_template.RPP`** from this directory into your project folder.
-3.  Open the template in REAPER.
-
-#### Step 3: Auto-import Stems with the Lua Script
-
-1.  In REAPER: **Actions** → **Show Action List** → **Load ReaScript** → select `import_stems.lua`.
-2.  Run the script and pick any one stem file when prompted.
-3.  The script scans the folder and places each stem on its matching track (Vocals, Drums, Bass, Other) automatically.
+1.  Run `demucs -n htdemucs_ft song.mp3` directly. Stems land in `separated/htdemucs_ft/song/`.
+2.  Open any REAPER project with tracks named Vocals, Drums, Bass and Other
+    (`stem_template.RPP`, if you have one, is not in the repo).
+3.  **Actions** → **Show Action List** → **Load ReaScript** → select `import_stems.lua`,
+    run it and pick any one stem file. It places each stem on its matching track.
 
 You now have a fully functional practice project. Mute your own instrument track to play along, or lower the Bass track for **Joey** to practice his part.
 
@@ -69,4 +71,4 @@ You now have a fully functional practice project. Mute your own instrument track
 ### 🛠️ Next Steps & Future Development
 
 * **Batch Processing:** Developing tools to process an entire setlist of songs at once.
-* **Model Configuration:** Documenting settings that yield the best results for Demucs models (e.g. `htdemucs_ft` for fine-tuned separation).
+* **Model Configuration:** `htdemucs_ft` is now the default. Still to document: Demucs `--shifts` and overlap settings, and whether UVR's RoFormer models do better on live recordings.
