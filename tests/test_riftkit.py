@@ -21,7 +21,7 @@ STOCKHOLM_SPLIT_DIR = FIXTURES_DIR / "stockholm_split"
 # ---------------------------------------------------------------------------
 
 def test_separate_stems_returns_correct_path(tmp_path):
-    stems_dir = tmp_path / "htdemucs" / "mysong"
+    stems_dir = tmp_path / "htdemucs_ft" / "mysong"
     stems_dir.mkdir(parents=True)
     (stems_dir / "vocals.wav").touch()
 
@@ -51,13 +51,13 @@ def test_separate_stems_raises_when_output_missing(tmp_path):
 
     with patch("riftkit.subprocess.run") as mock_run:
         mock_run.return_value = MagicMock(returncode=0)
-        # htdemucs/song/ is never created
+        # htdemucs_ft/song/ is never created
         with pytest.raises(FileNotFoundError):
             riftkit.separate_stems(audio, tmp_path)
 
 
 def test_separate_stems_passes_correct_args(tmp_path):
-    stems_dir = tmp_path / "htdemucs" / "song"
+    stems_dir = tmp_path / "htdemucs_ft" / "song"
     stems_dir.mkdir(parents=True)
 
     audio = tmp_path / "song.flac"
@@ -70,9 +70,25 @@ def test_separate_stems_passes_correct_args(tmp_path):
     call_args = mock_run.call_args[0][0]
     assert "-m" in call_args
     assert "demucs" in call_args
-    assert "--mp3" in call_args
+    assert "--mp3" not in call_args          # stems are WAV now
+    assert call_args[call_args.index("-n") + 1] == "htdemucs_ft"
     assert "--out" in call_args
     assert str(tmp_path) in call_args
+
+
+def test_separate_stems_honours_model_choice(tmp_path):
+    stems_dir = tmp_path / "htdemucs_6s" / "song"
+    stems_dir.mkdir(parents=True)
+    audio = tmp_path / "song.flac"
+    audio.touch()
+
+    with patch("riftkit.subprocess.run") as mock_run:
+        mock_run.return_value = MagicMock(returncode=0)
+        result = riftkit.separate_stems(audio, tmp_path, model="htdemucs_6s")
+
+    call_args = mock_run.call_args[0][0]
+    assert call_args[call_args.index("-n") + 1] == "htdemucs_6s"
+    assert result == stems_dir
     assert str(audio) in call_args
 
 
@@ -458,16 +474,18 @@ def test_main_runs_full_flow(tmp_path):
     audio = tmp_path / "song.mp3"
     audio.touch()
 
-    stems_dir = tmp_path / "out" / "htdemucs" / "song"
+    stems_dir = tmp_path / "out" / "htdemucs_ft" / "song"
     stems_dir.mkdir(parents=True)
-    (stems_dir / "vocals.wav").touch()
-
-    fake_template = tmp_path / "stem_template.RPP"
-    fake_template.write_text("<REAPER_PROJECT />")
+    for name in ("vocals", "drums", "bass", "other"):
+        (stems_dir / f"{name}.wav").touch()
 
     with patch("sys.argv", ["riftkit.py", str(audio), "--output", str(tmp_path / "out"), "--no-lyrics"]), \
          patch("riftkit.subprocess.run", return_value=MagicMock(returncode=0)), \
-         patch.object(riftkit, "TEMPLATE_RPP", fake_template):
+         patch("reaper_project.media_duration", return_value=180.0):
         riftkit.main()
 
-    assert (stems_dir.parent / "stem_template.RPP").exists()
+    project = stems_dir / "song.RPP"
+    assert project.exists()
+    text = project.read_text()
+    assert text.count("<TRACK") == 5
+    assert 'NAME "Original"' in text
