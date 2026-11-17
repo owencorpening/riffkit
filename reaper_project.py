@@ -209,7 +209,7 @@ def write_reaper_project(
         "  AUTOXFADE 129",
         "  SAMPLERATE 48000 0 0",
         "  TEMPO 120 4 4",
-        "  TIMELOCKMODE 1",
+        "  TIMELOCKMODE 0",
         "  CURSOR 0",
         "  ZOOM 100 0 0",
         *blocks,

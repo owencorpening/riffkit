@@ -81,6 +81,15 @@ def test_write_project_fails_with_no_stems(tmp_path):
         rp.write_reaper_project(empty / "song.RPP", empty, length_seconds=10)
 
 
+def test_project_uses_time_timebase(tmp_path):
+    # Time timebase: a tempo change moves only the grid, never the stems or lyrics.
+    stems_dir = _stems(tmp_path)
+    text = rp.write_reaper_project(stems_dir / "song.RPP", stems_dir, length_seconds=10).read_text()
+    lines = [line.strip() for line in text.splitlines()]
+    assert "TIMELOCKMODE 0" in lines
+    assert "TIMELOCKMODE 1" not in lines
+
+
 def test_blocks_are_balanced(tmp_path):
     stems_dir = _stems(tmp_path)
     original = tmp_path / "song.wav"
