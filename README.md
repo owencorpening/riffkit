@@ -106,6 +106,29 @@ re-cut without detection:
 Then run each song file through the song command above to get one
 REAPER project per song.
 
+### Using riffkit with an AI assistant
+
+The easiest way to run riffkit may be to let an AI do it for you, but it
+has to be the kind that can work on your computer.
+
+* **Coding agents** such as Claude Code, Codex, Gemini CLI or Cursor run
+  on your own machine and can install riffkit, run it and tell you where
+  the project is. This repository includes `AGENTS.md`, instructions they
+  read automatically. Open a terminal in the riffkit folder, start your
+  agent and say something like:
+
+  > Read the README. Install riffkit, then make a REAPER project from
+  > `~/Music/My Song.wav`. Check my free memory first, and tell me
+  > everything you run.
+
+* **Chat assistants** in a browser (ChatGPT, Gemini or Claude on the web)
+  can't run anything on your computer. They can still read this README
+  with you and explain each command as you type it.
+
+An AI makes the install and the commands easy. It can't make a slow
+computer fast or rescue a poor recording: those still decide how good
+the stems are.
+
 ### Setlist files
 
 One song per line, in the order played. A line in parentheses is music
@@ -162,6 +185,7 @@ TV for rehearsal.
 | `stem-separation/` | Stem separation notes and the manual `import_stems.lua`. |
 | `karaoke-display/` | A browser lyrics display synced to REAPER. |
 | `docs/` | Use cases, roadmap, testing notes and step-by-step SOPs. |
+| `AGENTS.md` | Instructions for AI coding agents running riffkit. |
 
 ### Philosophy
 

@@ -23,6 +23,7 @@
 !templates/*.RTrackTemplate
 
 # Generated/Working Directories
+data/
 stems/
 separated/
 projects/
@@ -86,6 +87,7 @@ config.override.yaml
 .env
 .env.local
 NEXT.md
+CLAUDE.local.md
 
 # Exception: Keep example config
 !config.example.yaml
