@@ -202,3 +202,128 @@ def test_build_output_includes_reference_report():
     doc = ta.build_output(Path("v.mp3"), [], [], report, {})
     assert doc["reference"]["corrections"][0]["corrected_to"] == "Austin"
     assert doc["reference"]["unmatched_reference_words"] == ["beautiful"]
+
+
+# ---------------------------------------------------------------------------
+# faster-whisper backend (stand-in model: no audio, no download)
+# ---------------------------------------------------------------------------
+
+import types
+from collections import namedtuple
+
+import numpy as np
+
+FakeWord = namedtuple("FakeWord", "start end word probability")
+FakeSegment = namedtuple(
+    "FakeSegment",
+    "id seek start end text tokens avg_logprob compression_ratio "
+    "no_speech_prob words temperature",
+)
+
+SEGMENT_KEYS = {
+    "id", "start", "end", "text", "avg_logprob", "compression_ratio",
+    "no_speech_prob", "temperature", "words",
+}
+
+
+def fake_segment(text, start, end, temperature=0.0):
+    words = [
+        FakeWord(start + i * 0.4, start + i * 0.4 + 0.3, f" {w}", 0.9)
+        for i, w in enumerate(text.split())
+    ]
+    return FakeSegment(1, 0, start, end, f" {text}", [1, 2], -0.2, 1.3, 0.02, words, temperature)
+
+
+def install_fake_faster_whisper(monkeypatch, segments):
+    calls = {"models": [], "transcribe": []}
+
+    class FakeModel:
+        def __init__(self, name, device=None, compute_type=None):
+            calls["models"].append((name, device, compute_type))
+
+        def transcribe(self, audio, **kwargs):
+            calls["transcribe"].append(kwargs)
+            return (s for s in segments), object()  # lazy, like the real one
+
+    module = types.SimpleNamespace(
+        WhisperModel=FakeModel,
+        decode_audio=lambda path, sampling_rate=16000: np.zeros(sampling_rate * 10, dtype=np.float32),
+    )
+    monkeypatch.setitem(sys.modules, "faster_whisper", module)
+    return calls
+
+
+def test_segment_to_dict_matches_openai_whisper_shape():
+    seg = ta.segment_to_dict(fake_segment("purple haze all in my brain", 1.0, 4.0), 3)
+    assert set(seg) == SEGMENT_KEYS
+    assert seg["id"] == 3
+    assert seg["start"] == 1.0 and seg["end"] == 4.0
+    assert seg["text"] == " purple haze all in my brain"
+    assert seg["avg_logprob"] == -0.2
+    assert seg["compression_ratio"] == 1.3
+    assert seg["no_speech_prob"] == 0.02
+    assert seg["temperature"] == 0.0
+    assert len(seg["words"]) == 6
+    assert set(seg["words"][0]) == {"word", "start", "end", "probability"}
+    assert seg["words"][0]["word"] == " purple"
+    assert all(isinstance(v, float) for w in seg["words"] for k, v in w.items() if k != "word")
+
+
+def test_segment_to_dict_handles_missing_words_and_temperature():
+    seg = ta.segment_to_dict(fake_segment("hey", 0.0, 1.0)._replace(words=None, temperature=None), 0)
+    assert seg["words"] == []
+    assert seg["temperature"] == 0.0
+
+
+def test_transcribe_returns_same_shape_with_faster_whisper(monkeypatch):
+    calls = install_fake_faster_whisper(
+        monkeypatch,
+        [fake_segment("purple haze all in my brain", 0.5, 3.0),
+         fake_segment("lately things just dont seem the same", 3.5, 6.0)],
+    )
+    transcriber = ta.AdaptiveTranscriber("medium", None, "en")
+    segments, log = transcriber.transcribe(Path("vocals.wav"))
+
+    assert log == []
+    assert [s["id"] for s in segments] == [0, 1]
+    for seg in segments:
+        assert set(seg) == SEGMENT_KEYS | {"model", "escalated"}
+        assert seg["model"] == "medium" and seg["escalated"] is False
+
+    assert calls["models"] == [("medium", "cpu", "int8")]
+    opts = calls["transcribe"][0]
+    assert opts["language"] == "en"
+    assert opts["word_timestamps"] is True
+    assert opts["beam_size"] == 5 and opts["best_of"] == 5
+    assert opts["condition_on_previous_text"] is True
+    assert opts["initial_prompt"] is None
+
+    # Downstream output is built exactly as before.
+    doc = ta.build_output(Path("vocals.wav"), segments, log, None, {"language": "en"})
+    assert doc["schema"] == "riffkit-transcript-v1"
+    assert len(doc["segments"]) == 2
+    assert doc["segments"][0]["words"][0]["word"] == " purple"
+
+
+def test_models_are_loaded_once_per_name(monkeypatch):
+    calls = install_fake_faster_whisper(monkeypatch, [fake_segment("hey joe", 0.0, 1.0)])
+    transcriber = ta.AdaptiveTranscriber("small", None, "en")
+    transcriber.transcribe(Path("a.wav"))
+    transcriber.transcribe(Path("b.wav"))
+    assert calls["models"] == [("small", "cpu", "int8")]
+
+
+def test_escalation_still_splices_with_faster_whisper(monkeypatch):
+    # A low-confidence base segment triggers escalation; the stand-in returns
+    # the same confident segment for the retry, so the loop runs end to end.
+    weak = fake_segment("scuse me while i kiss the sky", 1.0, 4.0)
+    weak = weak._replace(
+        avg_logprob=-1.5,
+        words=[w._replace(probability=0.1) for w in weak.words],
+    )
+    install_fake_faster_whisper(monkeypatch, [weak])
+    transcriber = ta.AdaptiveTranscriber("small", "medium", "en")
+    segments, log = transcriber.transcribe(Path("vocals.wav"))
+    assert len(log) == 1
+    assert log[0]["winner"] in {"base", "escalation"}
+    assert [s["id"] for s in segments] == list(range(len(segments)))

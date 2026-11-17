@@ -311,14 +311,38 @@ def offset_segments(segments: list[dict], offset: float, model_name: str) -> lis
     return out
 
 
+def segment_to_dict(segment, index: int) -> dict:
+    """Convert a faster-whisper Segment into the openai-whisper-style dict the
+    rest of this file uses (and that the transcript JSON is built from)."""
+    return {
+        "id": index,
+        "start": float(segment.start),
+        "end": float(segment.end),
+        "text": segment.text,
+        "avg_logprob": float(segment.avg_logprob),
+        "compression_ratio": float(segment.compression_ratio),
+        "no_speech_prob": float(segment.no_speech_prob),
+        "temperature": float(segment.temperature or 0.0),
+        "words": [
+            {
+                "word": w.word,
+                "start": float(w.start),
+                "end": float(w.end),
+                "probability": float(w.probability),
+            }
+            for w in segment.words or []
+        ],
+    }
+
+
 class AdaptiveTranscriber:
     """Owns lazy model loading + the escalation loop. Kept out of module scope
-    so importing this file never touches whisper/torch."""
+    so importing this file never touches faster-whisper/ctranslate2."""
 
     def __init__(self, base_model: str, escalation_model: str | None, language: str):
-        import whisper  # deferred: heavy import
+        import faster_whisper  # deferred: heavy import
 
-        self._whisper = whisper
+        self._fw = faster_whisper
         self.base_model_name = base_model
         self.escalation_model_name = escalation_model
         self.language = language
@@ -327,11 +351,15 @@ class AdaptiveTranscriber:
     def _model(self, name: str):
         if name not in self._models:
             print(f"[transcribe] loading model: {name}", file=sys.stderr)
-            self._models[name] = self._whisper.load_model(name)
+            self._models[name] = self._fw.WhisperModel(name, device="cpu", compute_type="int8")
         return self._models[name]
 
+    def load_audio(self, audio_path: Path):
+        """16 kHz mono float32, the same shape whisper.load_audio returned."""
+        return self._fw.decode_audio(str(audio_path), sampling_rate=SAMPLE_RATE)
+
     def _run(self, model_name: str, audio, initial_prompt: str | None = None) -> dict:
-        return self._model(model_name).transcribe(
+        segments, _info = self._model(model_name).transcribe(
             audio,
             language=self.language,
             word_timestamps=True,
@@ -339,12 +367,13 @@ class AdaptiveTranscriber:
             best_of=5,
             condition_on_previous_text=True,
             initial_prompt=initial_prompt,
-            verbose=None,
         )
+        # faster-whisper yields segments lazily; transcription happens here.
+        return {"segments": [segment_to_dict(s, i) for i, s in enumerate(segments)]}
 
     def transcribe(self, audio_path: Path) -> tuple[list[dict], list[dict]]:
         """Returns (segments, escalation_log)."""
-        audio = self._whisper.load_audio(str(audio_path))
+        audio = self.load_audio(audio_path)
 
         print(f"[transcribe] base pass ({self.base_model_name})…", file=sys.stderr)
         result = self._run(self.base_model_name, audio)
@@ -510,9 +539,7 @@ def main() -> int:
         sys.path.insert(0, str(Path(__file__).resolve().parent))
         import clean_transcript  # deferred: needs numpy
 
-        levels = clean_transcript.frame_levels_db(
-            transcriber._whisper.load_audio(str(audio_path))
-        )
+        levels = clean_transcript.frame_levels_db(transcriber.load_audio(audio_path))
         segments, cleanup_report = clean_transcript.clean_segments(segments, levels)
         print(
             f"[transcribe] cleanup: {cleanup_report['split']} split, "
