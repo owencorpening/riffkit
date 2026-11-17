@@ -2,6 +2,7 @@ import re
 from pathlib import Path
 
 import pytest
+from unittest.mock import patch
 
 import reaper_project as rp
 
@@ -121,3 +122,32 @@ def test_load_lyrics_reads_segments(tmp_path):
     path = tmp_path / "t.json"
     path.write_text('{"segments": [{"start": 1, "end": 2, "text": "hi"}]}')
     assert rp.load_lyrics(path) == [{"start": 1, "end": 2, "text": "hi"}]
+
+
+def test_opus_original_is_converted_to_wav_beside_the_project(tmp_path):
+    stems_dir = _stems(tmp_path)
+    original = tmp_path / "song.opus"
+    original.write_bytes(b"\0")
+
+    def fake_ffmpeg(cmd, **kwargs):
+        Path(cmd[-1]).write_bytes(b"\0")
+
+    with patch("reaper_project.subprocess.run", side_effect=fake_ffmpeg) as run:
+        text = rp.write_reaper_project(stems_dir / "song.RPP", stems_dir, original=original,
+                                       length_seconds=10).read_text()
+    assert run.call_args[0][0][-1] == str(stems_dir / "original.wav")
+    original_track = text.rsplit("<TRACK", 1)[1]
+    assert 'FILE "original.wav"' in original_track
+    assert "<SOURCE WAVE" in original_track
+    assert ".opus" not in text
+    assert rp.match_stem_files(stems_dir).keys() == {"Vocals", "Drums", "Bass", "Other"}
+
+
+def test_wav_original_is_used_in_place(tmp_path):
+    stems_dir = _stems(tmp_path)
+    original = tmp_path / "song.wav"
+    original.write_bytes(b"\0")
+    with patch("reaper_project.subprocess.run") as run:
+        rp.write_reaper_project(stems_dir / "song.RPP", stems_dir, original=original, length_seconds=10)
+    run.assert_not_called()
+    assert not (stems_dir / "original.wav").exists()

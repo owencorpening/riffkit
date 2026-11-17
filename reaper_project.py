@@ -105,6 +105,27 @@ def _track_block(name: str, media: Path | None, project_dir: Path, length: float
     return "\n".join(lines)
 
 
+def playable_original(original: Path, project_dir: Path) -> Path:
+    """Return a file REAPER can play for the Original track.
+
+    Formats REAPER reads from a project's SOURCE tag (wav, mp3, flac, aiff,
+    ogg) are used where they are. Anything else (opus, m4a, ...) is decoded
+    once to ``original.wav`` beside the project; given the wrong SOURCE type
+    REAPER shows an empty, silent item. The copy also keeps the song folder
+    self-contained.
+    """
+    original = Path(original)
+    if original.suffix.lower() in _SOURCE_TYPE:
+        return original
+    converted = Path(project_dir) / "original.wav"
+    if not converted.exists():
+        subprocess.run(
+            ["ffmpeg", "-nostdin", "-v", "error", "-y", "-i", str(original), str(converted)],
+            check=True,
+        )
+    return converted
+
+
 def load_lyrics(transcript_file: Path) -> list[dict]:
     """Segments from a Whisper-style transcript JSON (``{"segments": [...]}``)."""
     doc = json.loads(Path(transcript_file).read_text(encoding="utf-8"))
@@ -175,7 +196,8 @@ def write_reaper_project(
         for track, _ in STEM_TRACKS
     ]
     if original is not None:
-        blocks.append(_track_block("Original", Path(original).resolve(), project_dir,
+        original = playable_original(Path(original).resolve(), project_dir)
+        blocks.append(_track_block("Original", original, project_dir,
                                    length_seconds, muted=True))
     if lyrics:
         blocks.append(_lyrics_track_block(lyrics))
