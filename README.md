@@ -34,8 +34,9 @@ concert ──► split into songs ──► each song ──► stems ──►
 
 1. **Stem separation:** Demucs (`htdemucs_ft` by default) splits the song
    into four stems, as WAV files: vocals, drums, bass, and **other**.
-   *Other* is everything that isn't vocals, drums or bass, which in most
-   rock songs means the guitar (plus any keys or organ). For a separate
+   *Other* is everything that isn't vocals, drums or bass: in most rock
+   songs that means the guitar, plus any keyboards, horn or string
+   sections, and other instruments. For a separate
    guitar stem, use `--stem-model htdemucs_6s`, which also splits out
    guitar and piano, at some cost in quality.
 2. **Lyrics:** Whisper transcribes the vocals stem; the transcript is
