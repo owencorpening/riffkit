@@ -478,6 +478,12 @@ def main() -> int:
         action="store_true",
         help="Single-pass only; skip per-segment escalation",
     )
+    parser.add_argument(
+        "--no-clean",
+        action="store_true",
+        help="Keep Whisper's raw segments (skip splitting long lines and "
+        "dropping lines where the vocal stem is silent)",
+    )
     parser.add_argument("--lyrics", help="Reference lyric sheet (.txt) for disambiguation")
     parser.add_argument("--language", default="en")
     args = parser.parse_args()
@@ -498,6 +504,22 @@ def main() -> int:
     escalation_model = None if args.no_escalation else args.escalation_model
     transcriber = AdaptiveTranscriber(args.base_model, escalation_model, args.language)
     segments, escalation_log = transcriber.transcribe(audio_path)
+
+    cleanup_report = None
+    if not args.no_clean:
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        import clean_transcript  # deferred: needs numpy
+
+        levels = clean_transcript.frame_levels_db(
+            transcriber._whisper.load_audio(str(audio_path))
+        )
+        segments, cleanup_report = clean_transcript.clean_segments(segments, levels)
+        print(
+            f"[transcribe] cleanup: {cleanup_report['split']} split, "
+            f"{len(cleanup_report['dropped_silent'])} silent and "
+            f"{cleanup_report['dropped_empty']} empty line(s) dropped",
+            file=sys.stderr,
+        )
 
     reference_report = None
     if reference_words:
@@ -521,6 +543,8 @@ def main() -> int:
             "reference_lyrics": args.lyrics or None,
         },
     )
+    if cleanup_report is not None:
+        doc["cleanup"] = cleanup_report
 
     output_path = Path(args.output) if args.output else audio_path.with_suffix(".json")
     output_path.parent.mkdir(parents=True, exist_ok=True)
