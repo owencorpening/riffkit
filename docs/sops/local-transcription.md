@@ -54,6 +54,7 @@ For a full concert recording, use the chunked faster-whisper script instead of t
 - The audio must be chunked. Transcribing a whole concert in one pass runs this machine out of memory; the script decodes with `ffmpeg` and feeds the model 10-minute chunks, with timestamps offset back to absolute concert time.
 - It took 51 minutes for a 90-minute concert on this machine (`small` model, CPU).
 - Keep `--chunk-minutes` at 10; that is the tested setting. Word timestamps crashed faster-whisper on very short chunks (1 minute).
+- Transcripts of copyrighted recordings live in `data/` (for test fixtures, `data/fixtures/`) and are never committed.
 - The JSON is rewritten after every chunk, so an interrupted run keeps everything up to the last finished chunk.
 - Progress lines are printed as segments arrive; the run ends with `=== finished in N seconds ===`.
 - Needs `faster-whisper` (in `requirements.txt`, only used for transcription).

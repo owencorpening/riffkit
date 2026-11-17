@@ -10,6 +10,16 @@ import setlist_split as ss
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 GOTHENBURG = FIXTURES_DIR / "gothenburg"
+# Whisper transcripts of the Gothenburg recording are copyrighted material:
+# they live only on the developer's machine, never in the repo.
+LOCAL_GOTHENBURG = Path(__file__).resolve().parent.parent / "data" / "fixtures" / "gothenburg"
+
+
+def _local_transcript(name):
+    path = LOCAL_GOTHENBURG / name
+    if not path.exists():
+        pytest.skip(f"local fixture missing: {path} (copyrighted transcript, not in the repo)")
+    return ss.load_transcript(path)
 
 
 # ---------------------------------------------------------------------------
@@ -181,7 +191,7 @@ def test_both_gothenburg_transcripts_identify_the_same_songs():
     hints = ss.parse_setlist_hints(GOTHENBURG / "setlist.txt")
     wanted = {"Message To Love", "Hey Baby", "Foxy Lady", "Room Full Of Mirrors", "Hear My Train A-Comin'"}
     for name in ("whisper_small.json", "faster_whisper_small.json"):
-        transcript = ss.load_transcript(GOTHENBURG / name)
+        transcript = _local_transcript(name)
         found = {titles[a.song_index] for a in ss.find_anchors(titles, transcript, hints)}
         assert wanted <= found, name
         # Without the setlist hints, the titles alone must not identify these
@@ -218,7 +228,7 @@ def test_find_anchors_uses_word_timestamps_when_present():
 
 def test_gothenburg_transcript_has_title_anchors():
     titles = ss.parse_setlist(GOTHENBURG / "setlist.txt")
-    transcript = ss.load_transcript(GOTHENBURG / "whisper_small.json")
+    transcript = _local_transcript("whisper_small.json")
     full = {titles[a.song_index] for a in ss.find_anchors(titles, transcript) if a.weight == 1.0}
     assert {"Message To Love", "Hey Baby", "Foxy Lady", "Red House", "Room Full Of Mirrors"} <= full
 

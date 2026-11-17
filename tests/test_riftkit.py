@@ -341,6 +341,8 @@ def test_main_split_concert_prefers_timestamp_cues(tmp_path):
 def test_stockholm_fixture_pair_is_parseable():
     if shutil.which("ffprobe") is None:
         pytest.skip("ffprobe is required for the Stockholm fixture smoke test")
+    if not STOCKHOLM_AUDIO.exists():
+        pytest.skip(f"local fixture missing: {STOCKHOLM_AUDIO} (audio is not in the repo)")
 
     cues = riftkit.parse_song_cues(STOCKHOLM_LYRICS)
     duration = riftkit.probe_duration(STOCKHOLM_AUDIO)
