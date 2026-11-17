@@ -88,3 +88,36 @@ def test_blocks_are_balanced(tmp_path):
     opens = sum(1 for line in text.splitlines() if line.lstrip().startswith("<"))
     closes = sum(1 for line in text.splitlines() if line.strip() == ">")
     assert opens == closes
+
+
+def test_lyrics_go_on_a_last_track_as_text_items(tmp_path):
+    stems_dir = _stems(tmp_path)
+    lyrics = [
+        {"start": 36.1, "end": 40.3, "text": " Purple haze all in my brain."},
+        {"start": 41.0, "end": 41.0, "text": " Lately things"},
+        {"start": 50.0, "end": 51.0, "text": "  "},
+    ]
+    text = rp.write_reaper_project(stems_dir / "song.RPP", stems_dir,
+                                   length_seconds=10, lyrics=lyrics).read_text()
+    last_track = text.rsplit("<TRACK", 1)[1]
+    assert 'NAME "Lyrics"' in last_track
+    assert "|Purple haze all in my brain." in last_track
+    assert "POSITION 36.100" in last_track and "LENGTH 4.200" in last_track
+    assert "LENGTH 0.100" in last_track  # zero-length line still visible
+    assert last_track.count("<ITEM") == 2  # blank line skipped
+    assert "<SOURCE" not in last_track  # empty items, so REAPER shows the notes
+    opens = sum(1 for line in text.splitlines() if line.lstrip().startswith("<"))
+    closes = sum(1 for line in text.splitlines() if line.strip() == ">")
+    assert opens == closes
+
+
+def test_no_lyrics_means_no_lyrics_track(tmp_path):
+    stems_dir = _stems(tmp_path)
+    text = rp.write_reaper_project(stems_dir / "song.RPP", stems_dir, length_seconds=10).read_text()
+    assert "Lyrics" not in text
+
+
+def test_load_lyrics_reads_segments(tmp_path):
+    path = tmp_path / "t.json"
+    path.write_text('{"segments": [{"start": 1, "end": 2, "text": "hi"}]}')
+    assert rp.load_lyrics(path) == [{"start": 1, "end": 2, "text": "hi"}]

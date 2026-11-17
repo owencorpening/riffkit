@@ -8,6 +8,8 @@ stems by hand. The result opens with:
 
     Vocals, Drums, Bass, Other   one stem each, at the song's start
     Original                     the unseparated song, muted
+    Lyrics                       one text item per sung line, if a
+                                 transcript is given
 
 Paths inside the project are relative to the .RPP file, so the folder can
 be moved or zipped as a whole.
@@ -15,6 +17,7 @@ be moved or zipped as a whole.
 
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 import uuid
@@ -27,6 +30,7 @@ STEM_TRACKS = [
     ("Other", ("other", "guitar", "keys", "piano", "melody")),
 ]
 AUDIO_SUFFIXES = {".wav", ".mp3", ".flac", ".aiff", ".ogg"}
+MIN_LYRIC_SECONDS = 0.1
 _SOURCE_TYPE = {".wav": "WAVE", ".mp3": "MP3", ".flac": "FLAC", ".aiff": "WAVE", ".ogg": "VORBIS"}
 
 
@@ -101,17 +105,60 @@ def _track_block(name: str, media: Path | None, project_dir: Path, length: float
     return "\n".join(lines)
 
 
+def load_lyrics(transcript_file: Path) -> list[dict]:
+    """Segments from a Whisper-style transcript JSON (``{"segments": [...]}``)."""
+    doc = json.loads(Path(transcript_file).read_text(encoding="utf-8"))
+    return list(doc.get("segments") or [])
+
+
+def _lyrics_track_block(segments: list[dict]) -> str:
+    """A track named Lyrics with one empty item per line, text in its notes.
+
+    REAPER shows an empty item's notes as text on the item, so the lyrics
+    are readable on the timeline with no script or extension.
+    """
+    lines = [
+        "  <TRACK " + _guid(),
+        '    NAME "Lyrics"',
+        "    TRACKID " + _guid(),
+        "    MUTESOLO 0 0 0",
+        "    VOLPAN 1 0 -1 -1 1",
+    ]
+    for seg in segments:
+        text = " ".join(str(seg.get("text", "")).split())
+        if not text:
+            continue
+        start = float(seg["start"])
+        length = max(MIN_LYRIC_SECONDS, float(seg["end"]) - start)
+        lines += [
+            "    <ITEM",
+            f"      POSITION {start:.3f}",
+            f"      LENGTH {length:.3f}",
+            "      IGUID " + _guid(),
+            "      GUID " + _guid(),
+            "      <NOTES",
+            f"        |{text}",
+            "      >",
+            "    >",
+        ]
+    lines.append("  >")
+    return "\n".join(lines)
+
+
 def write_reaper_project(
     project_file: Path,
     stems_dir: Path,
     original: Path | None = None,
     length_seconds: float | None = None,
+    lyrics: list[dict] | None = None,
 ) -> Path:
     """Write ``project_file`` with the stems in ``stems_dir`` on named tracks.
 
     ``original`` is the unseparated song; it goes on a muted fifth track.
     ``length_seconds`` is the item length; measured from the first stem when
-    not given. Raises FileNotFoundError if no stem files are found.
+    not given. ``lyrics`` is a list of transcript segments (start, end,
+    text); they go on a last track named Lyrics. Raises FileNotFoundError if
+    no stem files are found.
     """
     project_file = Path(project_file)
     stems_dir = Path(stems_dir)
@@ -130,6 +177,8 @@ def write_reaper_project(
     if original is not None:
         blocks.append(_track_block("Original", Path(original).resolve(), project_dir,
                                    length_seconds, muted=True))
+    if lyrics:
+        blocks.append(_lyrics_track_block(lyrics))
 
     text = "\n".join([
         "<REAPER_PROJECT 0.1 \"7.0\" 0",
