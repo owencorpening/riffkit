@@ -121,3 +121,13 @@ def test_start_does_not_move_into_previous_line_or_beyond_search():
     ct.snap_starts_to_onsets(segs, levels)
     assert segs[1]["start"] == 2.7   # onset at 2.2 is inside the previous line
     assert segs[2]["start"] == 8.0   # onset at 6.0 is more than 0.75 s away
+
+
+def test_quieter_bleed_before_the_voice_is_not_taken_as_the_onset():
+    audio = stem(10.0, [(3.6, 5.0)])                  # voice, about -20 dB
+    t = np.arange(int(2.8 * SR), int(3.3 * SR))
+    audio[t] = 0.02 * np.sin(2 * np.pi * 330 * t / SR)  # bleed, about -37 dB
+    levels = ct.frame_levels_db(audio)
+    segs = [seg(" I see you", 3.0, 5.0)]
+    ct.snap_starts_to_onsets(segs, levels)
+    assert abs(segs[0]["start"] - 3.6) < 0.06

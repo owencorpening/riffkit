@@ -54,6 +54,12 @@ MIN_LINE_SECONDS = 0.05
 ONSET_THRESHOLD_DB = -40.0
 # ... if the crossing is within this many seconds of Whisper's start.
 ONSET_SEARCH_SECONDS = 0.75
+# A crossing counts only if the stem then reaches within ONSET_NEAR_PEAK_DB of
+# the line's own level inside ONSET_RISE_SECONDS. Guitar bleed in the vocal
+# stem crosses -40 dB too, but stays well below the singing (Foxey Lady,
+# "I see you": bleed at -26..-38 dB, voice at -16 dB).
+ONSET_RISE_SECONDS = 0.3
+ONSET_NEAR_PEAK_DB = 6.0
 
 TERMINAL_PUNCTUATION =(".", "!", "?")
 
@@ -118,6 +124,7 @@ def snap_starts_to_onsets(segments: list[dict], levels: np.ndarray, *,
 
     Whisper's line starts are often a few tenths of a second early or late.
     The nearest quiet-to-loud crossing within ``search_seconds`` of the start
+    that leads into the line's full level (not quieter bleed)
     (and not before the previous line ends) becomes the new start. Lines with
     no such crossing (voice already sounding, or silence) are left alone.
     Modifies segments in place; returns how many lines moved.
@@ -129,9 +136,12 @@ def snap_starts_to_onsets(segments: list[dict], levels: np.ndarray, *,
         lo = max(prev_end, start - search_seconds, 0.0)
         hi = min(start + search_seconds, end - MIN_LINE_SECONDS)
         first, last = int(np.ceil(lo / frame_seconds)), int(hi / frame_seconds)
+        target = line_level_db(levels, start, end, frame_seconds) - ONSET_NEAR_PEAK_DB
+        rise = int(ONSET_RISE_SECONDS / frame_seconds) + 1
         best = None
         for j in range(max(first, 1), min(last, len(levels) - 1) + 1):
-            if levels[j] > threshold_db >= levels[j - 1]:
+            if (levels[j] > threshold_db >= levels[j - 1]
+                    and levels[j:j + rise].max() >= target):
                 t = j * frame_seconds
                 if best is None or abs(t - start) < abs(best - start):
                     best = t
