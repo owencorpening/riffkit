@@ -181,6 +181,7 @@ TV for rehearsal.
 | `setlist_split.py` | Setlist-mode song splitting. |
 | `reaper_project.py` | Writes the REAPER project. |
 | `scripts/transcribe_concert.py` | Whisper transcript of a whole concert, in 10-minute pieces. |
+| `scripts/benchmark.py` | Times one song through the whole chain, checks the result and logs it to `data/benchmarks.csv`. |
 | `lyrics-sync/` | Vocal transcription, transcript cleanup, REAPER lyrics scripts. |
 | `stem-separation/` | Stem separation notes and the manual `import_stems.lua`. |
 | `karaoke-display/` | A browser lyrics display synced to REAPER. |
