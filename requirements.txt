@@ -13,3 +13,6 @@ torchcodec>=0.17
 
 # Only needed for transcription (scripts/transcribe_concert.py)
 faster-whisper>=1.2
+# faster-whisper 1.2.1 calls av.open(metadata_errors=...), which PyAV 19 removed.
+# Drop this pin once a faster-whisper release supports PyAV 19.
+av<19
