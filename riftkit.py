@@ -14,8 +14,8 @@ Usage:
 Steps:
     1. Separate stems with Demucs htdemucs_ft (vocals, drums, bass, other)
     2. Write a REAPER project with the stems and the original on tracks
-    3. Transcribe vocals with Whisper          [TODO]
-    4. Insert lyrics into REAPER project       [TODO]
+    3. Transcribe vocals with Whisper (medium) and clean the transcript
+    4. Insert lyrics into REAPER project on a Lyrics track
 
 Requires:
     pip install demucs
@@ -132,6 +132,29 @@ def parse_song_cues(song_list_file: Path) -> list[tuple[float, str]]:
         cues.append((timestamp, title))
 
     return cues
+
+
+LYRICS_MODEL = "medium"
+
+
+def transcribe_vocals(vocals: Path, output: Path, model: str = LYRICS_MODEL) -> bool:
+    """Transcribe a vocals stem to ``output`` (cleaned riffkit-transcript JSON).
+
+    Runs lyrics-sync/transcribe_adaptive.py as a separate process so the
+    Whisper model's memory (about 5 GB for medium) is freed when it ends.
+    A single medium pass with beam search gave the best lyrics on the
+    Winterland 1968 test set; the small+medium two-stage pass missed lines.
+    Returns True if the transcript was written.
+    """
+    script = Path(__file__).resolve().parent / "lyrics-sync" / "transcribe_adaptive.py"
+    print(f"Transcribing lyrics ({model} model; on CPU this takes roughly 2-10x "
+          f"the song's length)...")
+    result = subprocess.run(
+        [sys.executable, str(script), str(vocals), "--output", str(output),
+         "--base-model", model, "--no-escalation"],
+        stdin=subprocess.DEVNULL,
+    )
+    return result.returncode == 0 and Path(output).exists()
 
 
 def separate_stems(audio_file: Path, output_dir: Path, model: str = DEMUCS_MODEL) -> Path:
@@ -597,12 +620,20 @@ def main():
     reaper_project.write_reaper_project(rpp_path, stems_dir, original=audio_file)
     print(f"  Project → {rpp_path}")
 
-    # Step 3: Lyrics transcription (manual for now)
+    # Step 3: Transcribe the vocals stem and put the lyrics on a Lyrics track
     if not args.no_lyrics:
-        print("\n[TODO] Lyrics transcription is not wired into this pipeline yet.")
-        print("       Run lyrics-sync/transcribe_adaptive.py on the vocals stem:")
-        print(f"       .venv/bin/python lyrics-sync/transcribe_adaptive.py "
-              f"'{stems_dir}/vocals.wav'")
+        vocals = reaper_project.match_stem_files(stems_dir).get("Vocals")
+        lyrics_json = stems_dir / "lyrics.json"
+        if vocals is None:
+            print("  No vocals stem found; skipping lyrics.")
+        elif transcribe_vocals(vocals, lyrics_json):
+            reaper_project.write_reaper_project(
+                rpp_path, stems_dir, original=audio_file,
+                lyrics=reaper_project.load_lyrics(lyrics_json),
+            )
+            print(f"  Lyrics  → {lyrics_json} (on the Lyrics track)")
+        else:
+            print("  Lyrics transcription failed; the project has no Lyrics track.")
 
     print(f"""
 Done!

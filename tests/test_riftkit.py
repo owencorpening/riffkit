@@ -489,3 +489,41 @@ def test_main_runs_full_flow(tmp_path):
     text = project.read_text()
     assert text.count("<TRACK") == 5
     assert 'NAME "Original"' in text
+
+
+def test_main_puts_transcribed_lyrics_on_a_lyrics_track(tmp_path):
+    audio = tmp_path / "song.mp3"
+    audio.touch()
+    stems_dir = tmp_path / "out" / "htdemucs_ft" / "song"
+    stems_dir.mkdir(parents=True)
+    for name in ("vocals", "drums", "bass", "other"):
+        (stems_dir / f"{name}.wav").touch()
+
+    def fake_transcribe(vocals, output, model="medium"):
+        assert vocals.name == "vocals.wav"
+        Path(output).write_text('{"segments": [{"start": 12.5, "end": 15.0, "text": " Hey Joe"}]}')
+        return True
+
+    with patch("sys.argv", ["riftkit.py", str(audio), "--output", str(tmp_path / "out")]), \
+         patch("riftkit.subprocess.run", return_value=MagicMock(returncode=0)), \
+         patch("riftkit.transcribe_vocals", side_effect=fake_transcribe), \
+         patch("reaper_project.media_duration", return_value=180.0):
+        riftkit.main()
+
+    text = (stems_dir / "song.RPP").read_text()
+    assert text.count("<TRACK") == 6
+    assert "|Hey Joe" in text.rsplit("<TRACK", 1)[1]
+
+
+def test_transcribe_vocals_runs_medium_single_pass(tmp_path):
+    out = tmp_path / "lyrics.json"
+
+    def fake_run(cmd, **kwargs):
+        out.write_text("{}")
+        return MagicMock(returncode=0)
+
+    with patch("riftkit.subprocess.run", side_effect=fake_run) as run:
+        assert riftkit.transcribe_vocals(tmp_path / "vocals.wav", out)
+    cmd = run.call_args[0][0]
+    assert cmd[cmd.index("--base-model") + 1] == "medium"
+    assert "--no-escalation" in cmd

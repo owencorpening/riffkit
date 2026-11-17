@@ -47,6 +47,8 @@ You must have a workflow that produces timestamped JSON locally. For this pass, 
       --lyrics reference_lyrics.txt   # optional: disambiguates misheard words
     ```
 
+    The output is cleaned automatically: lines longer than 8 seconds are split at word gaps and sentence ends, and lines where the vocal stem is silent (below -50 dB) are dropped. Those are text Whisper invented or copied during instrumental passages. Add `--no-clean` to keep Whisper's raw segments. To clean a transcript you already have, run `lyrics-sync/clean_transcript.py transcript.json vocals.wav`.
+
 3.  Keep the JSON file in the same directory as your REAPER project file (`.RPP`) or wherever you want to browse for it.
 
 #### Step 2: Run the REAPER Script
