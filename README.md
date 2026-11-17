@@ -1,91 +1,153 @@
-# riffkit: Music Workflow for REAPER
+# riffkit
+
+Split live concerts into songs, separate each song into stems, and build
+a REAPER practice project with the lyrics already timed to the music.
+
+riffkit is a tool for guitarists (and anyone else) who learn songs by
+playing along: mute your own part, slow the song down without changing
+its pitch, loop the hard bit, and read the words as they are sung.
+
+> **Use it only on audio you have the right to use.** riffkit works on
+> your own files. This repository contains code only: no recordings,
+> stems, transcripts or projects made from anyone else's music.
 
 ***
 
-### 🛠️ What is `riffkit`?
+### What it does
 
-**`riffkit`** is the public-facing name for my music workflow system. Built around the **REAPER Digital Audio Workstation (DAW)**, it's a flexible collection of scripts and workflows for producing and consuming music and lyrics, from rough ideas to full-band collaboration.
+```
+concert recording ──► song files ──► stems ──► REAPER project
+   (optional)          (one per        (vocals,    (stems + original
+                        song)           drums,      mix + Lyrics track)
+                                        bass,
+                                        other)
+```
 
-**It is not a product or a startup.** It is my personal creative infrastructure, shared openly because you might find the components useful for your own creative work.
+1. **Song splitting** (optional): cut a long concert recording into one
+   file per song. Three ways to find where songs start and end:
+   * **Pause detection:** songs separated by silence.
+   * **Setlist mode:** give it the setlist and it finds one boundary per
+     song, even where the band barely pauses. Uses a Whisper transcript of
+     the concert to keep each title on the right song.
+   * **Your own marks:** a boundaries file with a start and end per song,
+     for example from markers you placed in REAPER. No detection at all.
+2. **Stem separation:** Demucs (`htdemucs_ft` by default) splits each song
+   into vocals, drums, bass and other, as WAV files.
+3. **Lyrics:** Whisper transcribes the vocals stem; the transcript is
+   cleaned up (long lines split, invented text over silent stretches
+   dropped, each line moved to where the voice comes in).
+4. **REAPER project:** one `.RPP` per song with Vocals, Drums, Bass and
+   Other on their own tracks, the original mix on a muted track, and the
+   lyrics on a Lyrics track. Open it and play.
 
-### 🎸 The Four Modes of `riffkit`
+### Quick start
 
-This infrastructure is built to support a resilient creative cycle, ensuring you spend less time on logistics and more time creating.
+You need Python 3, `ffmpeg` and `ffprobe` on your PATH, and
+[REAPER](https://www.reaper.fm/).
 
-| Mode | Goal & Use Case | **`riffkit`**'s Role |
+```bash
+git clone https://github.com/owencorpening/riffkit
+cd riffkit
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt
+```
+
+**One song to a REAPER project:**
+
+```bash
+.venv/bin/python riftkit.py "My Song.wav" --output ~/riffkit-projects
+```
+
+Then open `~/riffkit-projects/htdemucs_ft/My Song/My Song.RPP` in REAPER.
+Input can be WAV, MP3, FLAC, M4A or Opus.
+
+**A concert, split by pauses:**
+
+```bash
+.venv/bin/python riftkit.py concert.mp3 --split-concert --output ~/riffkit-songs
+```
+
+**A concert, split by its setlist:**
+
+```bash
+.venv/bin/python scripts/transcribe_concert.py concert.mp3 concert.json
+.venv/bin/python riftkit.py concert.mp3 --split-concert --setlist-mode \
+    --song-list setlist.txt --transcript concert.json --output ~/riffkit-songs
+```
+
+The printed boundaries list marks each song `ok` or `CHECK`. Listen to
+the `CHECK` ones, correct any time in the written `boundaries.txt`, and
+re-cut without detection:
+
+```bash
+.venv/bin/python riftkit.py concert.mp3 --split-concert \
+    --boundaries ~/riffkit-songs/concert_songs/boundaries.txt --output ~/riffkit-songs
+```
+
+Then run each song file through the one-song command above.
+
+### Setlist files
+
+One song per line, in the order played. A line in parentheses is music
+that isn't a song (a solo or a jam): riffkit finds it but writes no file.
+Words after a `|` are hints: words you know are sung in that song, which
+help riffkit recognise it in the transcript.
+
+```
+Setlist, in order:
+(solo)
+1. Spanish Castle Magic | waste your time
+2. Killing Floor
+3. Hear My Train A-Comin' | train
+```
+
+### What to expect
+
+* **Recording quality decides stem quality.** Clean recordings (studio
+  albums, official live releases) separate well. Audience tapes and
+  low-bitrate copies do not, and no model fixes that. For those, the
+  original mix with timed lyrics is still a useful practice project.
+* **It is slow on a CPU.** Expect several minutes per song for stems and
+  lyrics, and about 50 minutes to transcribe a 90-minute concert for
+  setlist mode. It needs several GB of free memory.
+* **Setlist mode is close, not perfect.** On the test concert it placed
+  12 of 13 song starts and 12 of 13 song ends within a few seconds, and
+  flagged the misses. Your own marks always override it.
+* **Tested on Linux only.**
+
+### Modes it is built for
+
+| Mode | Goal | riffkit's role |
 | :--- | :--- | :--- |
-| **Learning** | Learn individual parts by isolating drums, guitar, bass, vocals, or keyboards. | **Slow-down playback** without pitch change, and **mute/diminish** specific stems so you can practice one part against the rest of the song. |
-| **Rehearsal** | Practice as a band, distribute parts, and prep the full arrangement. | Easy generation of project files where bandmates can practice with their part muted, essentially acting as a **Digital Band Practice Manager**. |
-| **Composition** | Capture and arrange ideas the moment inspiration hits. | Streamlined project templates for scratch tracks, with easy tools for **lyric sync** and **version control**. |
-| **Performance** | Prepare the full media environment for live shows. | Centralized control over backing tracks, synchronized lyrics/chords on screen, and the potential to control external systems (like lighting or video). |
+| **Learning** | Learn one part by isolating drums, guitar, bass or vocals. | Stems you can mute or turn down, played in REAPER, which can slow down without changing pitch and loop a section. |
+| **Rehearsal** | Practice as a band. | One project per song, so each player can mute their own part. |
+| **Performance** | Lyrics on a big screen. | A Lyrics track timed to the song; a karaoke display in `karaoke-display/`. |
 
-### 📌 Example Use Case: Church Band
+### Example: church band
 
-`riffkit` is useful any time a group needs to turn songs into something people can actually rehearse and perform.
+A band receives four songs a few days before a service. Each song becomes
+its own REAPER project with stems and lyrics, so each player can mute
+their own part and learn it against the rest, and the words can go on a
+TV for rehearsal.
 
-One concrete example:
+### Repository layout
 
-* A church band plays twice a week.
-* They receive 4 MP3s about 3 days before the service.
-* Each song becomes its own REAPER project, usually with up to about five parts to manage.
-* Each band member needs to learn their own part well enough to play the set.
-* The band may also want lyrics on a large TV during rehearsal or performance.
+| Path | What it is |
+| :--- | :--- |
+| `riftkit.py` | The main command. |
+| `setlist_split.py` | Setlist-mode song splitting. |
+| `reaper_project.py` | Writes the REAPER project. |
+| `scripts/transcribe_concert.py` | Whisper transcript of a whole concert, in 10-minute pieces. |
+| `lyrics-sync/` | Vocal transcription, transcript cleanup, REAPER lyrics scripts. |
+| `stem-separation/` | Stem separation notes and the manual `import_stems.lua`. |
+| `karaoke-display/` | A browser lyrics display synced to REAPER. |
+| `docs/` | Use cases, roadmap, testing notes and step-by-step SOPs. |
 
-In that workflow, `riffkit` helps by:
+### Philosophy
 
-* separating the song into stems so each player can mute their own part and learn the others
-* generating or syncing lyrics for a shared display
-* building one REAPER project per song that is ready for practice or playback
-
-### 📌 Example Use Case: Concert Ingestion
-
-Sometimes the starting point is a full concert recording instead of clean song files.
-
-In that workflow:
-
-* a long MP3 or WAV contains multiple songs back-to-back
-* `riffkit` splits the recording into individual song files first
-* a sidecar `.txt` file can provide timestamped song starts and titles in order
-* each resulting song can then flow through the normal stem / lyrics / REAPER project pipeline
-
-### ⚙️ How It Works (The Core Components)
-
-`riffkit` is intentionally modular. Grab the pieces you need, adapt them, or ignore the rest.
-
-* **Audio Stemming:** Workflows for isolating individual **stems** (guitar, bass, drums, vocals) from a single mix using tools like **UVR (Ultimate Vocal Remover)**, creating customized backing tracks after processing time rather than instantly.
-* **Lyrics & Sync:** Leverages **AI transcription** (Whisper) to generate synchronized lyrics and even **chord suggestions** from any audio file, which are then imported directly into the REAPER timeline via **Lua Scripts**.
-* **Concert Splitting:** Breaks long multi-song recordings into individual song files before the normal workflow runs, using silence gaps as a first-pass boundary signal.
-* **REAPER Scripts:** A growing collection of Lua scripts that automate repetitive tasks, turning the DAW into a powerful, custom-fit environment for your entire creative process.
-
-*Note: concert splitting relies on `ffmpeg` and `ffprobe` being available on your PATH.*
-
-### 🤝 Philosophy: Use It or Lose It
-
-* **Built for Me First:** Features are added only when I need them for my own creative projects.
-* **Share Without Obligation:** The code is **open source** for you to use or adapt. There are **no support promises** and no commercial roadmap.
-* **Modular Design:** Take the scripts you need; leave the rest. The components are designed to work independently.
-
-### 🧭 Public Direction
-
-`riffkit` is aimed at small, real-world music workflows where people need to learn and perform a short set of songs with limited prep time.
-
-Near-term focus:
-
-* **Church band workflow:** take a handful of delivered MP3s, split stems, sync lyrics, and package the songs for practice and service playback.
-* **Concert ingestion:** split a long live recording into song-sized files before running the normal workflow.
-* **Part learning:** make it easy for each player to hear the rest of the band while muting their own part.
-* **Lyric display:** support large-screen lyric viewing for rehearsal or performance.
-* **Reliable packaging:** keep the output predictable so a project can be handed off and reused without a lot of manual cleanup.
-
-For a longer view of where the project is headed, see [docs/ROADMAP.md](docs/ROADMAP.md).
-For the concrete scenarios currently in scope, see [docs/USE_CASES.md](docs/USE_CASES.md).
-For the personal concert-library convention, see [docs/LIBRARY.md](docs/LIBRARY.md).
-For the testing approach and fixture plan, see [docs/TESTING.md](docs/TESTING.md).
-For the active working checklist, see [NEXT.md](NEXT.md) and [AGENT.md](AGENT.md).
-
-***
-
-**Ready to explore the components?**
-Check the folders for specific REAPER scripts and documentation on the integrated workflows.
+* **Built for me first.** Features arrive when I need them.
+* **Shared without obligation.** Open source under the MIT license, with
+  no support promises.
+* **Modular.** Take the pieces you need.
 
 *Historical note: this project was originally called Songster.*
