@@ -158,6 +158,16 @@ Setlist, in order:
   flagged the misses. Your own marks always override it.
 * **Tested on Linux only.**
 
+### Tested on
+* Ubuntu Studio Linux, AMD Ryzen 7 5700U (a low-power laptop processor
+  in a small desktop), 14 GB of memory, no graphics card used
+* One song (3 min 42 s) to a finished project: 32 minutes
+  (stems 8½ minutes, lyrics 23 minutes)
+* A 90-minute concert transcript for setlist mode: 51 minutes
+* Memory is the real limit: a single run peaks at about 5 GB, during
+  lyrics. With a browser open, runs have been killed for running out
+  of memory. Close the browser first; allow 8 GB free to be safe.
+
 ### Modes it is built for
 
 | Mode | Goal | riffkit's role |
