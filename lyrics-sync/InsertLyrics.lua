@@ -214,7 +214,12 @@ local function insert_lyrics(entries)
 
         local take = reaper.AddTakeToMediaItem(item)
         if take then
-            reaper.ULT_SetMediaItemNote(item, formatted_lyrics)
+            if reaper.ULT_SetMediaItemNote then
+                reaper.ULT_SetMediaItemNote(item, formatted_lyrics)
+            else
+                -- Native REAPER fallback when the SWS extension isn't installed.
+                reaper.GetSetMediaItemInfo_String(item, "P_NOTES", formatted_lyrics, true)
+            end
         else
             reaper.ShowConsoleMsg("Warning: Could not add take for entry " .. i .. "\n")
         end
