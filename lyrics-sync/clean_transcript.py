@@ -17,7 +17,9 @@ line, stage talk included, -45 dB or louder. So the cleanup is:
 
 - split long segments into lines at word gaps and sentence ends;
 - drop any line whose stretch of the vocal stem is near silent;
-- drop empty and zero-length lines.
+- drop empty and zero-length lines;
+- move each line's start to where the vocal stem goes from quiet to loud,
+  if that is within 0.75 s (Whisper's starts are often a few tenths off).
 
 Text is never rewritten; only whole lines are split or dropped.
 
@@ -48,7 +50,12 @@ LINE_GAP_SECONDS = 0.5
 # Lines shorter than this cannot be shown and are dropped.
 MIN_LINE_SECONDS = 0.05
 
-TERMINAL_PUNCTUATION = (".", "!", "?")
+# Line starts snap to the vocal stem crossing this level ...
+ONSET_THRESHOLD_DB = -40.0
+# ... if the crossing is within this many seconds of Whisper's start.
+ONSET_SEARCH_SECONDS = 0.75
+
+TERMINAL_PUNCTUATION =(".", "!", "?")
 
 
 def frame_levels_db(samples: np.ndarray, sample_rate: int = SAMPLE_RATE,
@@ -103,6 +110,41 @@ def split_long_segment(seg: dict, max_seconds: float = MAX_LINE_SECONDS,
     return [_segment_from_words(seg, line) for line in lines]
 
 
+def snap_starts_to_onsets(segments: list[dict], levels: np.ndarray, *,
+                          threshold_db: float = ONSET_THRESHOLD_DB,
+                          search_seconds: float = ONSET_SEARCH_SECONDS,
+                          frame_seconds: float = FRAME_SECONDS) -> int:
+    """Move each line's start to where the vocal stem goes from quiet to loud.
+
+    Whisper's line starts are often a few tenths of a second early or late.
+    The nearest quiet-to-loud crossing within ``search_seconds`` of the start
+    (and not before the previous line ends) becomes the new start. Lines with
+    no such crossing (voice already sounding, or silence) are left alone.
+    Modifies segments in place; returns how many lines moved.
+    """
+    moved = 0
+    prev_end = 0.0
+    for seg in segments:
+        start, end = float(seg["start"]), float(seg["end"])
+        lo = max(prev_end, start - search_seconds, 0.0)
+        hi = min(start + search_seconds, end - MIN_LINE_SECONDS)
+        first, last = int(np.ceil(lo / frame_seconds)), int(hi / frame_seconds)
+        best = None
+        for j in range(max(first, 1), min(last, len(levels) - 1) + 1):
+            if levels[j] > threshold_db >= levels[j - 1]:
+                t = j * frame_seconds
+                if best is None or abs(t - start) < abs(best - start):
+                    best = t
+        if best is not None and abs(best - start) >= frame_seconds:
+            seg["start"] = best
+            words = seg.get("words") or []
+            if words:
+                words[0] = {**words[0], "start": min(best, float(words[0]["end"]))}
+            moved += 1
+        prev_end = float(seg["end"])
+    return moved
+
+
 def clean_segments(segments: list[dict], levels: np.ndarray, *,
                    floor_db: float = SILENCE_FLOOR_DB,
                    max_seconds: float = MAX_LINE_SECONDS,
@@ -128,6 +170,7 @@ def clean_segments(segments: list[dict], levels: np.ndarray, *,
                 )
                 continue
             kept.append(piece)
+    report["starts_moved"] = snap_starts_to_onsets(kept, levels)
     for i, seg in enumerate(kept):
         seg["id"] = i
     return kept, report
@@ -171,7 +214,8 @@ def main() -> int:
     out.write_text(json.dumps(doc, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"[clean] {len(segments)} lines kept, {report['split']} split, "
           f"{len(report['dropped_silent'])} silent and {report['dropped_empty']} empty "
-          f"dropped -> {out}", file=sys.stderr)
+          f"dropped, {report['starts_moved']} starts moved "
+          f"-> {out}", file=sys.stderr)
     return 0
 
 

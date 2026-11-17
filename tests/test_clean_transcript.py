@@ -98,3 +98,26 @@ def test_input_segments_are_not_modified():
     original = seg(" a. b", 0.0, 10.0, words)
     ct.clean_segments([original], levels)
     assert original["text"] == " a. b" and "id" not in original
+
+
+def test_early_line_start_moves_to_voice_onset():
+    levels = ct.frame_levels_db(stem(10.0, [(3.5, 5.0)]))
+    segs = [seg(" late voice", 3.0, 5.0, [word(" late", 3.0, 4.0), word(" voice", 4.0, 5.0)])]
+    assert ct.snap_starts_to_onsets(segs, levels) == 1
+    assert abs(segs[0]["start"] - 3.5) < 0.06
+    assert segs[0]["words"][0]["start"] == segs[0]["start"]
+
+
+def test_late_line_start_moves_back_to_voice_onset():
+    levels = ct.frame_levels_db(stem(10.0, [(2.6, 5.0)]))
+    segs = [seg(" early voice", 3.0, 5.0)]
+    ct.snap_starts_to_onsets(segs, levels)
+    assert abs(segs[0]["start"] - 2.6) < 0.06
+
+
+def test_start_does_not_move_into_previous_line_or_beyond_search():
+    levels = ct.frame_levels_db(stem(10.0, [(1.0, 2.0), (2.2, 4.0), (6.0, 7.0)]))
+    segs = [seg(" one", 1.0, 2.5), seg(" two", 2.7, 4.0), seg(" far", 8.0, 9.0)]
+    ct.snap_starts_to_onsets(segs, levels)
+    assert segs[1]["start"] == 2.7   # onset at 2.2 is inside the previous line
+    assert segs[2]["start"] == 8.0   # onset at 6.0 is more than 0.75 s away
