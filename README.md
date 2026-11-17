@@ -150,9 +150,9 @@ Setlist, in order:
   albums, official live releases) separate well. Audience tapes and
   low-bitrate copies do not, and no model fixes that. For those, the
   original mix with timed lyrics is still a useful practice project.
-* **It is slow on a CPU.** Expect several minutes per song for stems and
-  lyrics, and about 50 minutes to transcribe a 90-minute concert for
-  setlist mode. It needs several GB of free memory.
+* **It is slow on a CPU.** Expect about half an hour per song for stems
+  and lyrics, and about 50 minutes to transcribe a 90-minute concert for
+  setlist mode. It needs several GB of free memory (see Tested on).
 * **Setlist mode is close, not perfect.** On the test concert it placed
   12 of 13 song starts and 12 of 13 song ends within a few seconds, and
   flagged the misses. Your own marks always override it.
