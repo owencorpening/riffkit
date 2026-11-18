@@ -32,6 +32,15 @@ import json
 import re
 from pathlib import Path
 
+# Windows consoles and redirected output often default to cp1252, which can't
+# encode the arrows and other symbols in our progress lines. Substitute "?"
+# instead of crashing a run that has already done minutes of work.
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(errors="replace")
+    except (AttributeError, ValueError):
+        pass
+
 
 TEMPLATE_RPP = Path(__file__).parent / "stem-separation" / "stem_template.RPP"
 DEMUCS_MODEL = "htdemucs_ft"  # fine-tuned 4-stem model: vocals, drums, bass, other (about 4x slower than htdemucs)
