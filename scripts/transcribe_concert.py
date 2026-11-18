@@ -12,11 +12,13 @@ Usage:
 """
 import argparse
 import json
+import os
 import subprocess
 import time
 
 import numpy as np
-from faster_whisper import WhisperModel
+os.environ.setdefault("HF_HUB_DISABLE_SYMLINKS_WARNING", "1")  # Windows: no symlinks without Developer Mode
+from faster_whisper import WhisperModel  # noqa: E402
 
 SR = 16000
 

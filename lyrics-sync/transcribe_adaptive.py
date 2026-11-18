@@ -32,6 +32,7 @@ from __future__ import annotations
 import argparse
 import difflib
 import json
+import os
 import re
 import sys
 from dataclasses import dataclass, field
@@ -340,6 +341,9 @@ class AdaptiveTranscriber:
     so importing this file never touches faster-whisper/ctranslate2."""
 
     def __init__(self, base_model: str, escalation_model: str | None, language: str):
+        # Windows can't symlink without Developer Mode; HF's cache still works,
+        # it just warns on every load. Silence it unless the user set it.
+        os.environ.setdefault("HF_HUB_DISABLE_SYMLINKS_WARNING", "1")
         import faster_whisper  # deferred: heavy import
 
         self._fw = faster_whisper
@@ -375,7 +379,7 @@ class AdaptiveTranscriber:
         """Returns (segments, escalation_log)."""
         audio = self.load_audio(audio_path)
 
-        print(f"[transcribe] base pass ({self.base_model_name})…", file=sys.stderr)
+        print(f"[transcribe] base pass ({self.base_model_name})...", file=sys.stderr)
         result = self._run(self.base_model_name, audio)
         segments = [dict(s) for s in result["segments"]]
         for seg in segments:
@@ -390,7 +394,7 @@ class AdaptiveTranscriber:
         if spans:
             print(
                 f"[transcribe] escalating {len(spans)} span(s) to "
-                f"{self.escalation_model_name}…",
+                f"{self.escalation_model_name}...",
                 file=sys.stderr,
             )
         duration = len(audio) / SAMPLE_RATE
@@ -494,7 +498,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(
         description="Adaptive Whisper transcription for isolated vocal stems."
     )
-    parser.add_argument("audio", help="Vocal stem audio file (mp3/wav/…)")
+    parser.add_argument("audio", help="Vocal stem audio file (mp3/wav/...)")
     parser.add_argument("--output", "-o", help="Output JSON path (default: alongside audio)")
     parser.add_argument("--base-model", default="small", help="Whisper model for the base pass")
     parser.add_argument(

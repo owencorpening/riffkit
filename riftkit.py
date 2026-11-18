@@ -200,7 +200,7 @@ def separate_stems(audio_file: Path, output_dir: Path, model: str = DEMUCS_MODEL
         for path in stems_dir.iterdir()
         if path.suffix.lower() in {".wav", ".mp3", ".flac"}
     ]
-    print(f"  Stems → {stems_dir}")
+    print(f"  Stems -> {stems_dir}")
     for f in sorted(stem_files):
         print(f"    {f.name}")
 
@@ -214,7 +214,7 @@ def copy_template(stems_dir: Path) -> Path:
 
     dest = stems_dir.parent / "stem_template.RPP"
     shutil.copy(TEMPLATE_RPP, dest)
-    print(f"  Template → {dest}")
+    print(f"  Template -> {dest}")
     return dest
 
 
@@ -423,7 +423,7 @@ def split_concert_into_songs(
     titles = song_titles or []
 
     print(f"Splitting concert: {audio_file.name}")
-    print(f"  Output → {split_dir}")
+    print(f"  Output -> {split_dir}")
     for i, segment in enumerate(segments, start=1):
         if use_cues:
             start, end, title = segment
@@ -443,7 +443,7 @@ def split_concert_into_songs(
                 "end_seconds": round(end, 3),
             }
         )
-        print(f"  {song_name}  [{start:.1f}s → {end:.1f}s]")
+        print(f"  {song_name}  [{start:.1f}s -> {end:.1f}s]")
 
     (split_dir / "segments.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
     return split_dir
@@ -627,7 +627,7 @@ def main():
 
     rpp_path = stems_dir / f"{audio_file.stem}.RPP"
     reaper_project.write_reaper_project(rpp_path, stems_dir, original=audio_file)
-    print(f"  Project → {rpp_path}")
+    print(f"  Project -> {rpp_path}")
 
     # Step 3: Transcribe the vocals stem and put the lyrics on a Lyrics track
     if not args.no_lyrics:
@@ -640,7 +640,7 @@ def main():
                 rpp_path, stems_dir, original=audio_file,
                 lyrics=reaper_project.load_lyrics(lyrics_json),
             )
-            print(f"  Lyrics  → {lyrics_json} (on the Lyrics track)")
+            print(f"  Lyrics  -> {lyrics_json} (on the Lyrics track)")
         else:
             print("  Lyrics transcription failed; the project has no Lyrics track.")
 
