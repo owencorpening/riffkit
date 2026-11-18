@@ -1,5 +1,7 @@
 # riffkit
 
+[![tests](https://github.com/owencorpening/riffkit/actions/workflows/tests.yml/badge.svg)](https://github.com/owencorpening/riffkit/actions/workflows/tests.yml)
+
 Turn a song into a REAPER practice project: the song separated into
 stems, with the lyrics already timed to the music. One project per song.
 Have a whole concert instead? riffkit can split it into songs first.
@@ -186,9 +188,10 @@ Setlist, in order:
 
 ### Regression testing
 
-The automated tests run only on my Ubuntu machine, and only when I run
-them. There is no automatic testing on GitHub, so a change could break
-Windows or macOS without anyone noticing.
+Every push runs the fast test suite (no audio, no models) on Linux,
+Windows and macOS with GitHub Actions. Full runs on real audio take
+minutes and several GB of memory, so they are done by hand, and only on
+the platforms marked Tested above.
 
 ### Modes it is built for
 
