@@ -340,7 +340,8 @@ class AdaptiveTranscriber:
     """Owns lazy model loading + the escalation loop. Kept out of module scope
     so importing this file never touches faster-whisper/ctranslate2."""
 
-    def __init__(self, base_model: str, escalation_model: str | None, language: str):
+    def __init__(self, base_model: str, escalation_model: str | None, language: str,
+                 no_fallback: bool = False):
         # Windows can't symlink without Developer Mode; HF's cache still works,
         # it just warns on every load. Silence it unless the user set it.
         os.environ.setdefault("HF_HUB_DISABLE_SYMLINKS_WARNING", "1")
@@ -348,6 +349,9 @@ class AdaptiveTranscriber:
 
         self._fw = faster_whisper
         self.base_model_name = base_model
+        # True: decode at temperature 0 only, so the same audio always gives
+        # the same words (no fallback to random sampling on unsure passages).
+        self.no_fallback = no_fallback
         self.escalation_model_name = escalation_model
         self.language = language
         self._models: dict[str, object] = {}
@@ -363,6 +367,9 @@ class AdaptiveTranscriber:
         return self._fw.decode_audio(str(audio_path), sampling_rate=SAMPLE_RATE)
 
     def _run(self, model_name: str, audio, initial_prompt: str | None = None) -> dict:
+        options = {}
+        if self.no_fallback:
+            options["temperature"] = 0.0
         segments, _info = self._model(model_name).transcribe(
             audio,
             language=self.language,
@@ -371,6 +378,7 @@ class AdaptiveTranscriber:
             best_of=5,
             condition_on_previous_text=True,
             initial_prompt=initial_prompt,
+            **options,
         )
         # faster-whisper yields segments lazily; transcription happens here.
         return {"segments": [segment_to_dict(s, i) for i, s in enumerate(segments)]}
@@ -517,6 +525,12 @@ def main() -> int:
         help="Keep Whisper's raw segments (skip splitting long lines and "
         "dropping lines where the vocal stem is silent)",
     )
+    parser.add_argument(
+        "--no-fallback",
+        action="store_true",
+        help="Decode at temperature 0 only (no fallback to random sampling), "
+        "so repeated runs on the same audio give the same words",
+    )
     parser.add_argument("--lyrics", help="Reference lyric sheet (.txt) for disambiguation")
     parser.add_argument("--language", default="en")
     args = parser.parse_args()
@@ -535,7 +549,9 @@ def main() -> int:
         reference_words = parse_reference_lyrics(lyrics_path.read_text(encoding="utf-8"))
 
     escalation_model = None if args.no_escalation else args.escalation_model
-    transcriber = AdaptiveTranscriber(args.base_model, escalation_model, args.language)
+    transcriber = AdaptiveTranscriber(
+        args.base_model, escalation_model, args.language, no_fallback=args.no_fallback
+    )
     segments, escalation_log = transcriber.transcribe(audio_path)
 
     cleanup_report = None
@@ -571,6 +587,7 @@ def main() -> int:
             "base_model": args.base_model,
             "escalation_model": escalation_model,
             "language": args.language,
+            "no_fallback": args.no_fallback,
             "reference_lyrics": args.lyrics or None,
         },
     )
