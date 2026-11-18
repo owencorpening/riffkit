@@ -1,7 +1,6 @@
 # Python dependencies for riftkit
 # Install with: pip3 install -r requirements.txt
 
-openai-whisper>=20231117
 PyYAML>=6.0
 
 # Needed for --setlist-mode
@@ -11,7 +10,7 @@ numpy>=1.24
 demucs>=4.1
 torchcodec>=0.17
 
-# Only needed for transcription (scripts/transcribe_concert.py)
+# Needed for lyrics and for concert transcripts (scripts/transcribe_concert.py)
 faster-whisper>=1.2
 # faster-whisper 1.2.1 calls av.open(metadata_errors=...), which PyAV 19 removed.
 # Drop this pin once a faster-whisper release supports PyAV 19.
