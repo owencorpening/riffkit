@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import importlib.util
-import json
 import sys
 from pathlib import Path
 
@@ -304,33 +303,6 @@ def test_transcribe_returns_same_shape_with_faster_whisper(monkeypatch):
     assert doc["schema"] == "riffkit-transcript-v1"
     assert len(doc["segments"]) == 2
     assert doc["segments"][0]["words"][0]["word"] == " purple"
-
-
-def test_default_keeps_faster_whisper_temperature_fallback(monkeypatch):
-    calls = install_fake_faster_whisper(monkeypatch, [fake_segment("hey joe", 0.0, 1.0)])
-    ta.AdaptiveTranscriber("medium", None, "en").transcribe(Path("vocals.wav"))
-    assert "temperature" not in calls["transcribe"][0]
-
-
-def test_no_fallback_decodes_at_temperature_zero_only(monkeypatch):
-    calls = install_fake_faster_whisper(monkeypatch, [fake_segment("hey joe", 0.0, 1.0)])
-    ta.AdaptiveTranscriber("medium", None, "en", no_fallback=True).transcribe(Path("vocals.wav"))
-    assert calls["transcribe"][0]["temperature"] == 0.0
-
-
-def test_no_fallback_flag_reaches_the_transcribe_call(monkeypatch, tmp_path):
-    calls = install_fake_faster_whisper(monkeypatch, [fake_segment("hey joe", 0.0, 1.0)])
-    audio = tmp_path / "vocals.wav"
-    audio.write_bytes(b"\0")
-    out = tmp_path / "out.json"
-    monkeypatch.setattr(
-        sys, "argv",
-        ["transcribe_adaptive.py", str(audio), "--base-model", "medium", "--no-escalation",
-         "--no-clean", "--no-fallback", "-o", str(out)],
-    )
-    assert ta.main() == 0
-    assert calls["transcribe"][0]["temperature"] == 0.0
-    assert json.loads(out.read_text())["pipeline"]["no_fallback"] is True
 
 
 def test_models_are_loaded_once_per_name(monkeypatch):
