@@ -169,7 +169,7 @@ Setlist, in order:
 * Memory is the real limit: a single run peaks at about 3.5 GB (stems
   and lyrics each use about 3 to 3.5 GB). With a browser open, runs
   have been killed for running out of memory. Close the browser first;
-  allow 8 GB free to be safe.
+  allow 5 GB free to be safe.
 
 ### Modes it is built for
 
