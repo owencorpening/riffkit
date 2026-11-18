@@ -1,3 +1,4 @@
+import os
 import re
 from pathlib import Path
 
@@ -51,6 +52,19 @@ def test_write_project_uses_paths_relative_to_the_project_file(tmp_path):
     text = project.read_text()
     assert 'FILE "../../song.mp3"' in text
     assert "<SOURCE MP3" in text
+
+
+def test_write_project_falls_back_to_absolute_path_across_drives(tmp_path):
+    stems_dir = _stems(tmp_path)
+    original = tmp_path / "song.mp3"
+    original.write_bytes(b"\0")
+    # os.path.relpath raises ValueError on Windows when the paths are on different drives.
+    with patch("reaper_project.os.path.relpath", side_effect=ValueError("path is on mount 'D:'")):
+        project = rp.write_reaper_project(stems_dir / "song.RPP", stems_dir, original=original, length_seconds=10)
+    text = project.read_text()
+    absolute = Path(os.path.abspath(original)).as_posix()
+    assert "\\" not in absolute
+    assert f'FILE "{absolute}"' in text
 
 
 def test_original_track_is_muted_and_last(tmp_path):

@@ -86,7 +86,10 @@ def _track_block(name: str, media: Path | None, project_dir: Path, length: float
         "    VOLPAN 1 0 -1 -1 1",
     ]
     if media is not None:
-        rel = os.path.relpath(media, project_dir)
+        try:
+            rel = Path(os.path.relpath(media, project_dir)).as_posix()
+        except ValueError:  # Windows: media and project on different drives
+            rel = Path(os.path.abspath(media)).as_posix()
         source_type = _SOURCE_TYPE.get(media.suffix.lower(), "WAVE")
         lines += [
             "    <ITEM",
