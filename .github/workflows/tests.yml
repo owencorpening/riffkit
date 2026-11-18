@@ -1,0 +1,22 @@
+name: tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  pytest:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      # Fast suite only: no demucs, torch or faster-whisper. Tests that need
+      # them, real audio, ffmpeg or local fixtures skip themselves.
+      - run: python -m pip install pytest numpy PyYAML
+      - run: python -m pytest -q -rs

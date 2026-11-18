@@ -380,6 +380,12 @@ def test_stockholm_split_fixture_matches_manifest():
         },
     ]
 
+    # The split MP3s are local-only (*.mp3 is gitignored); the manifest check
+    # above still runs everywhere.
+    first = STOCKHOLM_SPLIT_DIR / manifest[0]["file"]
+    if not first.exists():
+        pytest.skip(f"local fixture missing: {first} (audio is not in the repo)")
+
     for entry in manifest[:3]:
         assert (STOCKHOLM_SPLIT_DIR / entry["file"]).is_file()
         assert (STOCKHOLM_SPLIT_DIR / entry["file"]).stat().st_size > 0
