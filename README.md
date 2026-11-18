@@ -165,16 +165,30 @@ Setlist, in order:
 * **Tested on Linux only.**
 
 ### Tested on
-* Ubuntu Studio Linux, AMD Ryzen 7 5700U (a low-power laptop processor
-  in a small desktop), 14 GB of memory, no graphics card used
-* One song (3 min 42 s) to a finished project: about 11 minutes
-  (stems 8½ minutes, lyrics 2½ minutes with faster-whisper; the old
-  openai-whisper lyrics stage took 23 minutes)
-* A 90-minute concert transcript for setlist mode: 51 minutes
-* Memory is the real limit: a single run peaks at about 3.5 GB (stems
-  and lyrics each use about 3 to 3.5 GB). With a browser open, runs
-  have been killed for running out of memory. Close the browser first;
-  allow 5 GB free to be safe.
+
+| | Linux | Windows | macOS |
+| :--- | :--- | :--- | :--- |
+| Status | Tested | In progress | Untested |
+| Operating system | Ubuntu 26.04.1 LTS | Windows 10 (virtual machine) | — |
+| Machine | AMD Ryzen 7 5700U (a low-power laptop processor in a small desktop), 14 GB of memory | 6 GB of memory | — |
+| Python | 3.14.4 | 3.14 | — |
+| REAPER | 7.45 | — | — |
+| Key libraries | demucs 4.1.0, torch 2.15.0, faster-whisper 1.2.1, av 18.1.0 | — | — |
+| One song (3 min 42 s) to a finished project | about 11 minutes (stems 8½, lyrics 2½) | — | — |
+| Last tested | 2026-11-17 | — | — |
+
+* A 90-minute concert transcript for setlist mode took 51 minutes (Linux).
+* riffkit runs on the processor. A graphics card isn't used, and running
+  with one hasn't been tried.
+* Memory is the real limit: a run peaks at about 3.5 GB. With a browser
+  open, runs have been killed for running out of memory. Close the
+  browser first; allow 5 GB free to be safe.
+
+### Regression testing
+
+The automated tests run only on my Ubuntu machine, and only when I run
+them. There is no automatic testing on GitHub, so a change could break
+Windows or macOS without anyone noticing.
 
 ### Modes it is built for
 
