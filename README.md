@@ -150,9 +150,10 @@ Setlist, in order:
   albums, official live releases) separate well. Audience tapes and
   low-bitrate copies do not, and no model fixes that. For those, the
   original mix with timed lyrics is still a useful practice project.
-* **It is slow on a CPU.** Expect about half an hour per song for stems
+* **It is slow on a CPU.** Expect about 12 minutes per song for stems
   and lyrics, and about 50 minutes to transcribe a 90-minute concert for
-  setlist mode. It needs several GB of free memory (see Tested on).
+  setlist mode. The first run also downloads the lyrics model (about
+  1.5 GB). It needs several GB of free memory (see Tested on).
 * **Setlist mode is close, not perfect.** On the test concert it placed
   12 of 13 song starts and 12 of 13 song ends within a few seconds, and
   flagged the misses. Your own marks always override it.
@@ -161,12 +162,14 @@ Setlist, in order:
 ### Tested on
 * Ubuntu Studio Linux, AMD Ryzen 7 5700U (a low-power laptop processor
   in a small desktop), 14 GB of memory, no graphics card used
-* One song (3 min 42 s) to a finished project: 32 minutes
-  (stems 8½ minutes, lyrics 23 minutes)
+* One song (3 min 42 s) to a finished project: about 11 minutes
+  (stems 8½ minutes, lyrics 2½ minutes with faster-whisper; the old
+  openai-whisper lyrics stage took 23 minutes)
 * A 90-minute concert transcript for setlist mode: 51 minutes
-* Memory is the real limit: a single run peaks at about 5 GB, during
-  lyrics. With a browser open, runs have been killed for running out
-  of memory. Close the browser first; allow 8 GB free to be safe.
+* Memory is the real limit: a single run peaks at about 3.5 GB (stems
+  and lyrics each use about 3 to 3.5 GB). With a browser open, runs
+  have been killed for running out of memory. Close the browser first;
+  allow 8 GB free to be safe.
 
 ### Modes it is built for
 
