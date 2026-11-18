@@ -60,8 +60,13 @@ songs start and end:
 
 ### Quick start
 
-You need Python 3, `ffmpeg` and `ffprobe` on your PATH, and
-[REAPER](https://www.reaper.fm/).
+You need Python 3, `ffmpeg` and `ffprobe` on your PATH, and REAPER.
+
+**Install REAPER** from [reaper.fm/download.php](https://www.reaper.fm/download.php)
+(Windows, macOS or Linux). The full program is free to evaluate for 60
+days; see the REAPER site for licensing after that. riffkit itself
+doesn't need REAPER to run. You need it to open the projects riffkit
+makes.
 
 ```bash
 git clone https://github.com/owencorpening/riffkit
