@@ -175,8 +175,10 @@
   </section>
 
   <section>
-    <h2>Mute</h2>
-    <div id="mutes"></div>
+    <details id="mute-box" open>
+      <summary><h2>Mute</h2></summary>
+      <div id="mutes"></div>
+    </details>
   </section>
   <details id="diag">
     <summary><h2>Details</h2></summary>
@@ -190,7 +192,7 @@
 
 <script>
 /* Runs first, so it also catches errors in the scripts below. */
-var PAGE_VERSION = "remote 6 (2026-11-19, Details)";
+var PAGE_VERSION = "remote 7 (2026-11-19, Mute twisty)";
 var PAGE_LOADED = new Date();
 function diagTime(d) { return d.toTimeString().slice(0, 8); }
 document.getElementById("diag-version").textContent =
@@ -527,15 +529,19 @@ function render() {
 
 /* ---------------- start ---------------- */
 
-// Remember whether the loop controls are open, on this phone only.
-const loopBox = $("loop-box");
-try {
-  const saved = localStorage.getItem("riffkit-remote-loop-open");
-  if (saved !== null) loopBox.open = saved === "1";
-} catch {}
-loopBox.addEventListener("toggle", () => {
-  try { localStorage.setItem("riffkit-remote-loop-open", loopBox.open ? "1" : "0"); } catch {}
-});
+// Remember whether a folding section is open, on this phone only.
+function rememberOpen(id, key) {
+  const box = $(id);
+  try {
+    const saved = localStorage.getItem(key);
+    if (saved !== null) box.open = saved === "1";
+  } catch {}
+  box.addEventListener("toggle", () => {
+    try { localStorage.setItem(key, box.open ? "1" : "0"); } catch {}
+  });
+}
+rememberOpen("loop-box", "riffkit-remote-loop-open");
+rememberOpen("mute-box", "riffkit-remote-mute-open");
 
 const src = new URLSearchParams(location.search).get("src");
 if (src) {
