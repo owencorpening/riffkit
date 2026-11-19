@@ -67,6 +67,22 @@ def test_write_project_falls_back_to_absolute_path_across_drives(tmp_path):
     assert f'FILE "{absolute}"' in text
 
 
+def test_project_preserves_pitch_when_the_rate_changes(tmp_path):
+    stems_dir = _stems(tmp_path)
+    original = tmp_path / "song.mp3"
+    original.write_bytes(b"\0")
+    lyrics = [{"start": 1.0, "end": 2.0, "text": " la la"}]
+    project = rp.write_reaper_project(stems_dir / "song.RPP", stems_dir, original=original,
+                                      length_seconds=10, lyrics=lyrics)
+    text = project.read_text()
+    # Project: rate 1, preserve pitch on, Rate range 0.25-4 (as REAPER writes it).
+    header = text.split("<TRACK", 1)[0]
+    assert "\n  PLAYRATE 1 1 0.25 4\n" in header
+    # Every audio item (4 stems + original) keeps its own preserve-pitch flag on.
+    assert text.count("\n      PLAYRATE 1 1 0 -1 0 0.0025\n") == 5
+    assert text.count("<SOURCE") == 5
+
+
 def test_original_track_is_muted_and_last(tmp_path):
     stems_dir = _stems(tmp_path)
     original = tmp_path / "song.mp3"

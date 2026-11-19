@@ -33,6 +33,14 @@ AUDIO_SUFFIXES = {".wav", ".mp3", ".flac", ".aiff", ".ogg"}
 MIN_LYRIC_SECONDS = 0.1
 _SOURCE_TYPE = {".wav": "WAVE", ".mp3": "MP3", ".flac": "FLAC", ".aiff": "WAVE", ".ogg": "VORBIS"}
 
+# Keep pitch when the Rate control slows the song down. These are the lines
+# REAPER itself writes after "Preserve pitch in audio items when changing
+# master playrate" is turned on (checked by saving a project from REAPER 7.45):
+# project rate 1, preserve-pitch flag 1, Rate range 0.25 to 4; and on each
+# audio item, rate 1 with its own preserve-pitch flag 1.
+PROJECT_PLAYRATE = "  PLAYRATE 1 1 0.25 4"
+ITEM_PLAYRATE = "      PLAYRATE 1 1 0 -1 0 0.0025"
+
 
 def _guid() -> str:
     return "{" + str(uuid.uuid4()).upper() + "}"
@@ -97,6 +105,7 @@ def _track_block(name: str, media: Path | None, project_dir: Path, length: float
             "      IGUID " + _guid(),
             "      GUID " + _guid(),
             f"      LENGTH {length:.6f}",
+            ITEM_PLAYRATE,
             f'      NAME "{_escape(media.name)}"',
             "      VOLPAN 1 0 1 -1",
             f"      <SOURCE {source_type}",
@@ -213,6 +222,7 @@ def write_reaper_project(
         "  SAMPLERATE 48000 0 0",
         "  TEMPO 120 4 4",
         "  TIMELOCKMODE 0",
+        PROJECT_PLAYRATE,
         "  CURSOR 0",
         "  ZOOM 100 0 0",
         *blocks,
