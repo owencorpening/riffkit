@@ -80,6 +80,9 @@
   h2 { font-size: 0.85rem; font-weight: 600; color: var(--dim); text-transform: uppercase; letter-spacing: 0.08em; }
   #transport { display: flex; flex-direction: column; gap: 0.5rem; }
   .row.wide-right { grid-auto-columns: 1fr 2fr; }
+  /* Start and End get more room than the 5 s buttons, so labels stay on one line. */
+  .row.edges-wide { grid-template-columns: 1.35fr 1fr 1fr 1.35fr; grid-auto-flow: row; }
+  .row.edges-wide button { white-space: nowrap; padding: 0.4rem 0.2rem; }
   .row { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 0.5rem; }
 
   button {
@@ -136,7 +139,7 @@
 <body>
 <main>
   <div id="transport">
-    <div class="row">
+    <div class="row edges-wide">
       <button id="to-start">|◀ Start</button>
       <button id="back">« 5 s</button>
       <button id="forward">5 s »</button>
@@ -205,7 +208,7 @@
 
 <script>
 /* Runs first, so it also catches errors in the scripts below. */
-var PAGE_VERSION = "remote 10 (2026-11-19, full transport)";
+var PAGE_VERSION = "remote 11 (2026-11-19, wider Start/End)";
 var PAGE_LOADED = new Date();
 function diagTime(d) { return d.toTimeString().slice(0, 8); }
 document.getElementById("diag-version").textContent =
