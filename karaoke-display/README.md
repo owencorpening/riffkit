@@ -69,6 +69,39 @@ instead, so ad-hoc use needs no file copying at all.
   red = transport unreachable (display freezes rather than drifting),
   blue = demo mode; plus song name and position.
 
+## Phone remote (remote.html)
+
+`remote.html` is a phone remote for one riffkit project, served by REAPER
+the same way. It uses only the commands REAPER's own web pages use.
+
+- Play/Pause, back 5 s.
+- Speed: Slower / Faster in 5% steps (50% to 150%) and 100%. Pitch stays
+  the same. REAPER can't tell a web page the current speed, so the page
+  sets 100% when it opens and always shows the speed it last set.
+- Mutes for Vocals, Drums, Bass, Other and the Original mix, found by
+  track name (the Lyrics track isn't shown). No record buttons.
+- A/B loop: tap **A** at the start, **B** at the end; looping starts there.
+- With `?src=`: **Loop this line** loops the lyric line playing now;
+  **+ line** / **− line** grow or shrink it. Each change pauses, sets the
+  loop, then plays from its start.
+- **Stop loop** clears either kind (time selection, loop points, repeat).
+
+Setup, once (next to karaoke.html):
+
+```bash
+ln -s ~/dev/riffkit/karaoke-display/remote.html ~/.config/REAPER/reaper_www_root/
+```
+
+On the phone (same Wi-Fi as the computer running REAPER), open:
+
+```
+http://<computer-ip>:8080/remote.html?src=songs/<song>.json
+```
+
+`<song>.json` is the same file karaoke.html uses. Without `?src=` the
+page works the same, minus Loop this line. Find the computer's IP with
+`hostname -I` (Linux) or `ipconfig` (Windows).
+
 ## Testing without REAPER
 
 Open the page with `?demo=1` (any static server, e.g.

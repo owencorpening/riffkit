@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>riffkit remote</title>
+<style>
+  :root {
+    --bg: #0b0e14;
+    --text: #f5f7fa;
+    --dim: #6b7789;
+    --chip: #97a3b3;
+    --accent: #ffb454;
+    --button: #1a2030;
+    --button-on: #2b3346;
+    --muted: #e05661;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { min-height: 100%; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+  }
+  main {
+    max-width: 34rem;
+    margin: 0 auto;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  /* Status: position, speed, loop, connection. */
+  #status {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 0.4rem 0.8rem;
+  }
+  #pos { font-size: 2.6rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+  #rate { font-size: 1.6rem; font-weight: 600; color: var(--accent); justify-self: end; }
+  #dot {
+    width: 0.8rem; height: 0.8rem; border-radius: 50%;
+    background: var(--muted);
+  }
+  #dot.ok { background: #7fd962; }
+  #loop-status { grid-column: 1 / -1; font-size: 1.1rem; color: var(--chip); }
+  #loop-status.on { color: var(--accent); }
+
+  section { display: flex; flex-direction: column; gap: 0.5rem; }
+  h2 { font-size: 0.85rem; font-weight: 600; color: var(--dim); text-transform: uppercase; letter-spacing: 0.08em; }
+  .row { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 0.5rem; }
+
+  button {
+    font: inherit;
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: var(--text);
+    background: var(--button);
+    border: 2px solid transparent;
+    border-radius: 0.8rem;
+    min-height: 3.6rem;
+    padding: 0.4rem;
+    touch-action: manipulation;
+  }
+  button:active { background: var(--button-on); }
+  button:disabled { color: var(--dim); }
+  button.big { min-height: 4.6rem; font-size: 1.5rem; }
+  button.primary { background: var(--accent); color: #1a1005; }
+  button.marked { border-color: var(--accent); }
+  /* A muted track: dimmed name, red outline. */
+  button.mute-on { color: var(--dim); border-color: var(--muted); text-decoration: line-through; }
+
+  #mutes { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+  #mutes .original { grid-column: 1 / -1; }
+  .hidden { display: none !important; }
+
+  /* Landscape: two columns side by side, still thumb-sized. */
+  @media (orientation: landscape) and (min-width: 600px) {
+    main {
+      max-width: 60rem;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      align-items: start;
+    }
+    #status { grid-column: 1 / -1; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <div id="status">
+    <span id="pos">0:00</span>
+    <span id="rate">100%</span>
+    <span id="dot" title="connection to REAPER"></span>
+    <span id="loop-status">No loop</span>
+  </div>
+
+  <section>
+    <div class="row">
+      <button id="back" class="big">« 5 s</button>
+      <button id="play" class="big primary">Play</button>
+    </div>
+    <h2>Speed</h2>
+    <div class="row">
+      <button id="slower">Slower</button>
+      <button id="normal">100%</button>
+      <button id="faster">Faster</button>
+    </div>
+  </section>
+
+  <section>
+    <h2>Loop</h2>
+    <div class="row">
+      <button id="mark-a">A</button>
+      <button id="mark-b" disabled>B</button>
+    </div>
+    <div id="line-controls" class="hidden">
+      <div class="row">
+        <button id="loop-line">Loop this line</button>
+      </div>
+      <div class="row" style="margin-top:0.5rem">
+        <button id="line-less" disabled>− line</button>
+        <button id="line-more" disabled>+ line</button>
+      </div>
+    </div>
+    <button id="stop-loop" class="big">Stop loop</button>
+  </section>
+
+  <section>
+    <h2>Mute</h2>
+    <div id="mutes"></div>
+  </section>
+</main>
+
+<script id="loop-math">
+"use strict";
+/* ------------------------------------------------------------------ *
+ * Loop, line and speed math: small plain functions, no DOM, no REAPER.
+ * tests/test_remote_page.py runs these with Node.
+ * ------------------------------------------------------------------ */
+
+const RATE_MIN = 0.5;
+const RATE_MAX = 1.5;
+const RATE_STEP = 0.05;
+
+// Speed one step slower (dir -1) or faster (dir +1), kept between 50% and 150%.
+function stepRate(rate, dir) {
+  const next = Math.round((rate + dir * RATE_STEP) * 100) / 100;
+  return Math.min(RATE_MAX, Math.max(RATE_MIN, next));
+}
+
+// 0.9 -> "90%"
+function rateLabel(rate) {
+  return `${Math.round(rate * 100)}%`;
+}
+
+// 72.4 -> "1:12"
+function formatTime(seconds) {
+  const s = Math.max(0, Math.floor(seconds));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+}
+
+// "Looping 1:12 to 1:24" or "No loop".
+function loopLabel(loop) {
+  return loop ? `Looping ${formatTime(loop.start)} to ${formatTime(loop.end)}` : "No loop";
+}
+
+// A/B loop from two marks, in either order; null if they are the same spot.
+function abLoop(a, b) {
+  const start = Math.min(a, b);
+  const end = Math.max(a, b);
+  return end - start < 0.1 ? null : { start, end };
+}
+
+// Lyric lines from a riffkit lyrics.json: [{start, end}], sung lines only, by time.
+function linesFromDoc(doc) {
+  return (doc.segments || [])
+    .filter((s) => (s.text || "").trim())
+    .map((s) => ({ start: Number(s.start), end: Number(s.end) }))
+    .sort((a, b) => a.start - b.start);
+}
+
+// The line playing at pos: the last one that has started. Before the
+// first line, the first line. -1 when there are no lines.
+function lineAt(lines, pos) {
+  if (!lines.length) return -1;
+  let found = 0;
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i].start <= pos) found = i;
+    else break;
+  }
+  return found;
+}
+
+// Loop over lines first..last: from the first line's start to the last line's end.
+function lineLoop(lines, first, last) {
+  return { start: lines[first].start, end: Math.max(lines[last].end, lines[first].start) };
+}
+
+// "+ line": one more line at the end, if there is one.
+function addLine(lines, sel) {
+  return { first: sel.first, last: Math.min(sel.last + 1, lines.length - 1) };
+}
+
+// "- line": one line fewer at the end, never fewer than one.
+function removeLine(sel) {
+  return { first: sel.first, last: Math.max(sel.first, sel.last - 1) };
+}
+</script>
+
+<script>
+"use strict";
+/* ------------------------------------------------------------------ *
+ * riffkit remote: a phone remote for one riffkit project, served by
+ * REAPER's web interface like karaoke.html. Only the commands REAPER's
+ * own pages use (see main.js in REAPER's reaper_www_root):
+ *
+ *   TRANSPORT, GET/REPEAT, NTRACK, TRACK      read state
+ *   1007 play, 1008 pause                     REAPER actions
+ *   SET/POS/<s>                               move the play position
+ *   SET/REPEAT/<0|1>                          repeat off / on
+ *   SET/TRACK/<i>/MUTE/-1                     toggle one track's mute
+ *   40625 / 40626                             time selection start / end
+ *                                             at the play position
+ *   40020                                     remove time selection and loop points
+ *   OSC/loop/start/time:<s>, OSC/loop/end/time:<s>
+ *                                             loop points, exactly
+ *   OSC/playrate/raw:<rate>                   playback speed
+ *
+ * REAPER can't report the playback speed to a web page, so the page
+ * sets 100% when it opens and shows the speed it last set.
+ *
+ * ?src=songs/<song>.json  the song's lyrics (same file as karaoke.html)
+ *                         turns on "Loop this line".
+ * ------------------------------------------------------------------ */
+
+const POLL_MS = 250;
+const PLAY = 1007;
+const PAUSE = 1008;
+const TIMESEL_START = 40625;
+const TIMESEL_END = 40626;
+const CLEAR_LOOP = 40020;
+
+// Track name in REAPER -> button label. The Lyrics track is never shown.
+const MUTE_TRACKS = [
+  ["vocals", "Vocals"], ["drums", "Drums"], ["bass", "Bass"], ["other", "Other"],
+  ["original", "Original mix"],
+];
+
+const $ = (id) => document.getElementById(id);
+
+const state = {
+  connected: false,
+  playstate: 0,   // 0 stopped, 1 playing, 2 paused
+  pos: 0,
+  repeat: false,
+  rate: 1,
+  markA: null,    // A/B: the A mark, waiting for B
+  loop: null,     // {start, end} this page set
+  loopSetAt: 0,   // when it was set (a poll already on its way may predate it)
+  lines: [],      // lyric lines from ?src
+  sel: null,      // {first, last} lines in the line loop
+  tracks: [],     // [{index, name, muted}]
+};
+
+function send(commands) {
+  return fetch("/_/" + commands.join(";"))
+    .then((r) => r.text())
+    .catch(() => "");
+}
+
+/* ---------------- reading REAPER ---------------- */
+
+async function poll() {
+  try {
+    const r = await fetch("/_/TRANSPORT;GET/REPEAT;TRACK");
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const tracks = [];
+    for (const line of (await r.text()).split("\n")) {
+      const f = line.split("\t");
+      if (f[0] === "TRANSPORT") {
+        state.playstate = parseInt(f[1], 10);
+        state.pos = parseFloat(f[2]) || 0;
+      } else if (f[0] === "GET/REPEAT") {
+        state.repeat = f[1] === "1";
+      } else if (f[0] === "TRACK" && f[1] !== "0") {
+        tracks.push({ index: parseInt(f[1], 10), name: f[2], muted: (parseInt(f[3], 10) & 8) !== 0 });
+      }
+    }
+    state.tracks = tracks;
+    state.connected = true;
+  } catch {
+    state.connected = false;
+  }
+  render();
+}
+
+/* ---------------- loops ---------------- */
+
+// Time selection and loop points to [start, end], repeat on.
+function loopCommands(loop) {
+  return [
+    `SET/POS/${loop.start}`, TIMESEL_START,
+    `SET/POS/${loop.end}`, TIMESEL_END,
+    `OSC/loop/start/time:${loop.start}`, `OSC/loop/end/time:${loop.end}`,
+    `SET/POS/${loop.start}`, "SET/REPEAT/1",
+  ];
+}
+
+function setAbLoop(loop) {
+  state.loop = loop;
+  state.loopSetAt = performance.now();
+  state.sel = null;
+  send(loopCommands(loop)).then(poll);
+}
+
+// Line loops pause first and play from the loop start, so the jump to the
+// line's end (to set it) is never heard.
+function setLineLoop(sel) {
+  state.sel = sel;
+  state.markA = null;
+  state.loop = lineLoop(state.lines, sel.first, sel.last);
+  state.loopSetAt = performance.now();
+  const pause = state.playstate === 1 ? [PAUSE] : [];
+  send([...pause, ...loopCommands(state.loop), PLAY]).then(poll);
+}
+
+function stopLoop() {
+  state.loop = null;
+  state.sel = null;
+  state.markA = null;
+  send([CLEAR_LOOP, "SET/REPEAT/0"]).then(poll);
+}
+
+/* ---------------- controls ---------------- */
+
+function setRate(rate) {
+  state.rate = rate;
+  send([`OSC/playrate/raw:${rate}`]);
+  render();
+}
+
+$("play").onclick = () => send([state.playstate === 1 ? PAUSE : PLAY]).then(poll);
+$("back").onclick = () => send([`SET/POS/${Math.max(0, state.pos - 5)}`]).then(poll);
+$("slower").onclick = () => setRate(stepRate(state.rate, -1));
+$("faster").onclick = () => setRate(stepRate(state.rate, +1));
+$("normal").onclick = () => setRate(1);
+
+$("mark-a").onclick = () => { state.markA = state.pos; render(); };
+$("mark-b").onclick = () => {
+  if (state.markA === null) return;
+  const loop = abLoop(state.markA, state.pos);
+  state.markA = null;
+  if (loop) setAbLoop(loop);
+  else render();
+};
+$("loop-line").onclick = () => {
+  const i = lineAt(state.lines, state.pos);
+  if (i >= 0) setLineLoop({ first: i, last: i });
+};
+$("line-more").onclick = () => { if (state.sel) setLineLoop(addLine(state.lines, state.sel)); };
+$("line-less").onclick = () => { if (state.sel) setLineLoop(removeLine(state.sel)); };
+$("stop-loop").onclick = stopLoop;
+
+function toggleMute(track) {
+  track.muted = !track.muted;  // show it now; the next poll confirms
+  render();
+  send([`SET/TRACK/${track.index}/MUTE/-1`]).then(poll);
+}
+
+/* ---------------- drawing ---------------- */
+
+let muteKey = "";
+
+function renderMutes() {
+  const shown = [];
+  for (const [name, label] of MUTE_TRACKS) {
+    const track = state.tracks.find((t) => t.name.trim().toLowerCase() === name);
+    if (track) shown.push({ track, label });
+  }
+  const key = shown.map((s) => `${s.track.index}:${s.label}`).join(",");
+  const box = $("mutes");
+  if (key !== muteKey) {
+    muteKey = key;
+    box.innerHTML = "";
+    for (const { track, label } of shown) {
+      const b = document.createElement("button");
+      b.textContent = label;
+      b.dataset.index = track.index;
+      if (label === "Original mix") b.className = "original";
+      b.onclick = () => toggleMute(state.tracks.find((t) => t.index === track.index));
+      box.appendChild(b);
+    }
+  }
+  for (const b of box.children) {
+    const track = state.tracks.find((t) => t.index === Number(b.dataset.index));
+    b.classList.toggle("mute-on", !!(track && track.muted));
+  }
+}
+
+function render() {
+  $("dot").className = state.connected ? "ok" : "";
+  $("pos").textContent = formatTime(state.pos);
+  $("rate").textContent = rateLabel(state.rate);
+  $("play").textContent = state.playstate === 1 ? "Pause" : "Play";
+
+  // A loop this page set only counts while REAPER's repeat is still on.
+  if (state.loop && !state.repeat && performance.now() - state.loopSetAt > 1500) {
+    state.loop = null;
+    state.sel = null;
+  }
+  const status = $("loop-status");
+  if (state.markA !== null) {
+    status.textContent = `A at ${formatTime(state.markA)}: tap B to loop`;
+  } else {
+    status.textContent = loopLabel(state.loop);
+  }
+  status.classList.toggle("on", !!state.loop || state.markA !== null);
+
+  $("mark-a").classList.toggle("marked", state.markA !== null);
+  $("mark-b").disabled = state.markA === null;
+  $("line-more").disabled = !state.sel || state.sel.last >= state.lines.length - 1;
+  $("line-less").disabled = !state.sel || state.sel.last <= state.sel.first;
+  renderMutes();
+}
+
+/* ---------------- start ---------------- */
+
+const src = new URLSearchParams(location.search).get("src");
+if (src) {
+  fetch(src)
+    .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
+    .then((doc) => {
+      state.lines = linesFromDoc(doc);
+      $("line-controls").classList.toggle("hidden", !state.lines.length);
+    })
+    .catch(() => {});
+}
+
+setRate(1);  // the speed shown is always the speed this page set
+poll();
+setInterval(poll, POLL_MS);
+</script>
+</body>
+</html>
