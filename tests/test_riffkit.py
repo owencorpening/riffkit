@@ -6,7 +6,7 @@ from unittest.mock import patch, MagicMock
 
 import pytest
 
-import riftkit
+import riffkit
 import library_tools
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
@@ -28,9 +28,9 @@ def test_separate_stems_returns_correct_path(tmp_path):
     audio = tmp_path / "mysong.mp3"
     audio.touch()
 
-    with patch("riftkit.subprocess.run") as mock_run:
+    with patch("riffkit.subprocess.run") as mock_run:
         mock_run.return_value = MagicMock(returncode=0)
-        result = riftkit.separate_stems(audio, tmp_path)
+        result = riffkit.separate_stems(audio, tmp_path)
 
     assert result == stems_dir
 
@@ -39,21 +39,21 @@ def test_separate_stems_raises_on_demucs_failure(tmp_path):
     audio = tmp_path / "song.mp3"
     audio.touch()
 
-    with patch("riftkit.subprocess.run") as mock_run:
+    with patch("riffkit.subprocess.run") as mock_run:
         mock_run.return_value = MagicMock(returncode=1)
         with pytest.raises(RuntimeError, match="Demucs failed"):
-            riftkit.separate_stems(audio, tmp_path)
+            riffkit.separate_stems(audio, tmp_path)
 
 
 def test_separate_stems_raises_when_output_missing(tmp_path):
     audio = tmp_path / "song.mp3"
     audio.touch()
 
-    with patch("riftkit.subprocess.run") as mock_run:
+    with patch("riffkit.subprocess.run") as mock_run:
         mock_run.return_value = MagicMock(returncode=0)
         # htdemucs_ft/song/ is never created
         with pytest.raises(FileNotFoundError):
-            riftkit.separate_stems(audio, tmp_path)
+            riffkit.separate_stems(audio, tmp_path)
 
 
 def test_separate_stems_passes_correct_args(tmp_path):
@@ -63,9 +63,9 @@ def test_separate_stems_passes_correct_args(tmp_path):
     audio = tmp_path / "song.flac"
     audio.touch()
 
-    with patch("riftkit.subprocess.run") as mock_run:
+    with patch("riffkit.subprocess.run") as mock_run:
         mock_run.return_value = MagicMock(returncode=0)
-        riftkit.separate_stems(audio, tmp_path)
+        riffkit.separate_stems(audio, tmp_path)
 
     call_args = mock_run.call_args[0][0]
     assert "-m" in call_args
@@ -82,9 +82,9 @@ def test_separate_stems_honours_model_choice(tmp_path):
     audio = tmp_path / "song.flac"
     audio.touch()
 
-    with patch("riftkit.subprocess.run") as mock_run:
+    with patch("riffkit.subprocess.run") as mock_run:
         mock_run.return_value = MagicMock(returncode=0)
-        result = riftkit.separate_stems(audio, tmp_path, model="htdemucs_6s")
+        result = riffkit.separate_stems(audio, tmp_path, model="htdemucs_6s")
 
     call_args = mock_run.call_args[0][0]
     assert call_args[call_args.index("-n") + 1] == "htdemucs_6s"
@@ -103,8 +103,8 @@ def test_copy_template_copies_rpp(tmp_path):
     fake_template = tmp_path / "stem_template.RPP"
     fake_template.write_text("<REAPER_PROJECT />")
 
-    with patch.object(riftkit, "TEMPLATE_RPP", fake_template):
-        dest = riftkit.copy_template(stems_dir)
+    with patch.object(riffkit, "TEMPLATE_RPP", fake_template):
+        dest = riffkit.copy_template(stems_dir)
 
     assert dest == tmp_path / "htdemucs" / "stem_template.RPP"
     assert dest.exists()
@@ -117,9 +117,9 @@ def test_copy_template_raises_when_template_missing(tmp_path):
 
     missing = tmp_path / "nonexistent.RPP"
 
-    with patch.object(riftkit, "TEMPLATE_RPP", missing):
+    with patch.object(riffkit, "TEMPLATE_RPP", missing):
         with pytest.raises(FileNotFoundError, match="Template not found"):
-            riftkit.copy_template(stems_dir)
+            riffkit.copy_template(stems_dir)
 
 
 # ---------------------------------------------------------------------------
@@ -127,7 +127,7 @@ def test_copy_template_raises_when_template_missing(tmp_path):
 # ---------------------------------------------------------------------------
 
 def test_build_song_segments_from_silences():
-    segments = riftkit.build_song_segments(
+    segments = riffkit.build_song_segments(
         300.0,
         [(55.0, 70.0), (150.0, 168.0), (240.0, 252.0)],
     )
@@ -154,7 +154,7 @@ def test_parse_song_titles_from_sidecar(tmp_path):
         encoding="utf-8",
     )
 
-    assert riftkit.parse_song_titles(song_list) == [
+    assert riffkit.parse_song_titles(song_list) == [
         "Stone Free",
         "Foxy Lady",
         "Hey Baby",
@@ -174,7 +174,7 @@ def test_parse_song_titles_from_leading_block(tmp_path):
         encoding="utf-8",
     )
 
-    assert riftkit.parse_song_titles(song_list) == [
+    assert riffkit.parse_song_titles(song_list) == [
         "Fire",
         "Spanish Castle Magic",
         "Machine Gun",
@@ -182,7 +182,7 @@ def test_parse_song_titles_from_leading_block(tmp_path):
 
 
 def test_parse_song_cues_from_timestamped_sidecar(tmp_path):
-    assert riftkit.parse_song_cues(STOCKHOLM_LYRICS) == [
+    assert riffkit.parse_song_cues(STOCKHOLM_LYRICS) == [
         (0.0, "Introduction"),
         (70.0, "Fire Part 1"),
         (212.0, "Drum Solo"),
@@ -206,7 +206,7 @@ def test_parse_song_cues_ignores_noncue_chatter(tmp_path):
         encoding="utf-8",
     )
 
-    assert riftkit.parse_song_cues(song_list) == [
+    assert riffkit.parse_song_cues(song_list) == [
         (0.0, "Introduction"),
         (70.0, "Fire Part 1"),
         (212.0, "Drum Solo"),
@@ -214,7 +214,7 @@ def test_parse_song_cues_ignores_noncue_chatter(tmp_path):
 
 
 def test_parse_song_cues_ignores_chatter_fixture():
-    assert riftkit.parse_song_cues(STOCKHOLM_LYRICS_WITH_CHATTER) == [
+    assert riffkit.parse_song_cues(STOCKHOLM_LYRICS_WITH_CHATTER) == [
         (0.0, "Introduction"),
         (70.0, "Fire Part 1"),
         (212.0, "Drum Solo"),
@@ -224,7 +224,7 @@ def test_parse_song_cues_ignores_chatter_fixture():
 
 
 def test_sanitize_filename_replaces_bad_chars():
-    assert riftkit.sanitize_filename("A/B:C*D?E\"F<G>H|I") == "A_B_C_D_E_F_G_H_I"
+    assert riffkit.sanitize_filename("A/B:C*D?E\"F<G>H|I") == "A_B_C_D_E_F_G_H_I"
 
 
 def test_main_split_concert_invokes_splitter(tmp_path):
@@ -233,9 +233,9 @@ def test_main_split_concert_invokes_splitter(tmp_path):
 
     out_dir = tmp_path / "out"
 
-    with patch("sys.argv", ["riftkit.py", str(audio), "--output", str(out_dir), "--split-concert"]), \
-         patch.object(riftkit, "split_concert_into_songs") as mock_split:
-        riftkit.main()
+    with patch("sys.argv", ["riffkit.py", str(audio), "--output", str(out_dir), "--split-concert"]), \
+         patch.object(riffkit, "split_concert_into_songs") as mock_split:
+        riffkit.main()
 
     mock_split.assert_called_once()
     called_audio, called_output = mock_split.call_args.args[:2]
@@ -248,10 +248,10 @@ def test_split_concert_into_songs_writes_manifest(tmp_path):
     audio.touch()
     out_dir = tmp_path / "out"
 
-    with patch.object(riftkit, "probe_duration", return_value=300.0), \
-         patch.object(riftkit, "detect_silence_intervals", return_value=[(55.0, 70.0), (150.0, 168.0)]), \
-         patch.object(riftkit, "export_segment") as mock_export:
-        split_dir = riftkit.split_concert_into_songs(audio, out_dir)
+    with patch.object(riffkit, "probe_duration", return_value=300.0), \
+         patch.object(riffkit, "detect_silence_intervals", return_value=[(55.0, 70.0), (150.0, 168.0)]), \
+         patch.object(riffkit, "export_segment") as mock_export:
+        split_dir = riffkit.split_concert_into_songs(audio, out_dir)
 
     assert split_dir == out_dir / "concert_songs"
     manifest = json.loads((split_dir / "segments.json").read_text())
@@ -269,10 +269,10 @@ def test_split_concert_into_songs_uses_titles(tmp_path):
     out_dir = tmp_path / "out"
     titles = ["Stone Free", "Foxy Lady", "Hey Baby"]
 
-    with patch.object(riftkit, "probe_duration", return_value=300.0), \
-         patch.object(riftkit, "detect_silence_intervals", return_value=[(55.0, 70.0), (150.0, 168.0)]), \
-         patch.object(riftkit, "export_segment"):
-        split_dir = riftkit.split_concert_into_songs(audio, out_dir, song_titles=titles)
+    with patch.object(riffkit, "probe_duration", return_value=300.0), \
+         patch.object(riffkit, "detect_silence_intervals", return_value=[(55.0, 70.0), (150.0, 168.0)]), \
+         patch.object(riffkit, "export_segment"):
+        split_dir = riffkit.split_concert_into_songs(audio, out_dir, song_titles=titles)
 
     manifest = json.loads((split_dir / "segments.json").read_text())
     assert manifest[0]["file"] == "01 - Stone Free.mp3"
@@ -286,9 +286,9 @@ def test_split_concert_into_songs_uses_timestamp_cues(tmp_path):
     out_dir = tmp_path / "out"
     cues = [(12.0, "Intro"), (55.0, "Stone Free"), (150.0, "Foxy Lady")]
 
-    with patch.object(riftkit, "probe_duration", return_value=300.0), \
-         patch.object(riftkit, "export_segment") as mock_export:
-        split_dir = riftkit.split_concert_into_songs(audio, out_dir, song_cues=cues)
+    with patch.object(riffkit, "probe_duration", return_value=300.0), \
+         patch.object(riffkit, "export_segment") as mock_export:
+        split_dir = riffkit.split_concert_into_songs(audio, out_dir, song_cues=cues)
 
     assert split_dir == out_dir / "concert_songs"
     manifest = json.loads((split_dir / "segments.json").read_text())
@@ -301,7 +301,7 @@ def test_split_concert_into_songs_uses_timestamp_cues(tmp_path):
 
 
 def test_build_song_segments_from_cues_dedupes_and_skips_out_of_range():
-    segments = riftkit.build_song_segments_from_cues(
+    segments = riffkit.build_song_segments_from_cues(
         120.0,
         [
             (55.0, "Stone Free"),
@@ -328,9 +328,9 @@ def test_main_split_concert_prefers_timestamp_cues(tmp_path):
 
     out_dir = tmp_path / "out"
 
-    with patch("sys.argv", ["riftkit.py", str(audio), "--output", str(out_dir), "--split-concert"]), \
-         patch.object(riftkit, "split_concert_into_songs") as mock_split:
-        riftkit.main()
+    with patch("sys.argv", ["riffkit.py", str(audio), "--output", str(out_dir), "--split-concert"]), \
+         patch.object(riffkit, "split_concert_into_songs") as mock_split:
+        riffkit.main()
 
     mock_split.assert_called_once()
     kwargs = mock_split.call_args.kwargs
@@ -344,8 +344,8 @@ def test_stockholm_fixture_pair_is_parseable():
     if not STOCKHOLM_AUDIO.exists():
         pytest.skip(f"local fixture missing: {STOCKHOLM_AUDIO} (audio is not in the repo)")
 
-    cues = riftkit.parse_song_cues(STOCKHOLM_LYRICS)
-    duration = riftkit.probe_duration(STOCKHOLM_AUDIO)
+    cues = riffkit.parse_song_cues(STOCKHOLM_LYRICS)
+    duration = riffkit.probe_duration(STOCKHOLM_AUDIO)
 
     assert len(cues) == 5
     assert duration > 590.0
@@ -473,8 +473,8 @@ def test_import_split_concert_to_library_creates_song_folders(tmp_path):
 
 def test_main_exits_on_missing_audio(tmp_path, capsys):
     with pytest.raises(SystemExit) as exc:
-        with patch("sys.argv", ["riftkit.py", str(tmp_path / "ghost.mp3")]):
-            riftkit.main()
+        with patch("sys.argv", ["riffkit.py", str(tmp_path / "ghost.mp3")]):
+            riffkit.main()
     assert exc.value.code == 1
 
 
@@ -487,10 +487,10 @@ def test_main_runs_full_flow(tmp_path):
     for name in ("vocals", "drums", "bass", "other"):
         (stems_dir / f"{name}.wav").touch()
 
-    with patch("sys.argv", ["riftkit.py", str(audio), "--output", str(tmp_path / "out"), "--no-lyrics"]), \
-         patch("riftkit.subprocess.run", return_value=MagicMock(returncode=0)), \
+    with patch("sys.argv", ["riffkit.py", str(audio), "--output", str(tmp_path / "out"), "--no-lyrics"]), \
+         patch("riffkit.subprocess.run", return_value=MagicMock(returncode=0)), \
          patch("reaper_project.media_duration", return_value=180.0):
-        riftkit.main()
+        riffkit.main()
 
     project = stems_dir / "song.RPP"
     assert project.exists()
@@ -512,11 +512,11 @@ def test_main_puts_transcribed_lyrics_on_a_lyrics_track(tmp_path):
         Path(output).write_text('{"segments": [{"start": 12.5, "end": 15.0, "text": " Hey Joe"}]}')
         return True
 
-    with patch("sys.argv", ["riftkit.py", str(audio), "--output", str(tmp_path / "out")]), \
-         patch("riftkit.subprocess.run", return_value=MagicMock(returncode=0)), \
-         patch("riftkit.transcribe_vocals", side_effect=fake_transcribe), \
+    with patch("sys.argv", ["riffkit.py", str(audio), "--output", str(tmp_path / "out")]), \
+         patch("riffkit.subprocess.run", return_value=MagicMock(returncode=0)), \
+         patch("riffkit.transcribe_vocals", side_effect=fake_transcribe), \
          patch("reaper_project.media_duration", return_value=180.0):
-        riftkit.main()
+        riffkit.main()
 
     text = (stems_dir / "song.RPP").read_text()
     assert text.count("<TRACK") == 6
@@ -531,8 +531,8 @@ def test_transcribe_vocals_runs_medium_single_pass(tmp_path):
         out.write_text("{}")
         return MagicMock(returncode=0)
 
-    with patch("riftkit.subprocess.run", side_effect=fake_run) as run:
-        assert riftkit.transcribe_vocals(tmp_path / "vocals.wav", out)
+    with patch("riffkit.subprocess.run", side_effect=fake_run) as run:
+        assert riffkit.transcribe_vocals(tmp_path / "vocals.wav", out)
     cmd = run.call_args[0][0]
     assert cmd[cmd.index("--base-model") + 1] == "medium"
     assert "--no-escalation" in cmd

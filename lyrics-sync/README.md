@@ -25,7 +25,7 @@ This component is a **two-step workflow** that requires one external dependency:
 | Step | Action | Required Tool/Dependency | Output |
 | :--- | :--- | :--- | :--- |
 | **Step 1: Transcription** | Run the vocal stem through `transcribe_adaptive.py` (adaptive multi-pass local Whisper). | **Local `openai-whisper`** via `lyrics-sync/transcribe_adaptive.py` | A **`riffkit-transcript-v1` JSON file** with word-level timestamps. |
-| **Step 2: Import** | Run the custom script inside REAPER. | **`riftkit/lyrics-sync/InsertLyrics.lua`** (Whisper JSON) or **`AddLyrics.lua`** (plain text) | Lyrics inserted as timed items on a REAPER track. |
+| **Step 2: Import** | Run the custom script inside REAPER. | **`riffkit/lyrics-sync/InsertLyrics.lua`** (Whisper JSON) or **`AddLyrics.lua`** (plain text) | Lyrics inserted as timed items on a REAPER track. |
 
 #### External Dependency: Local Whisper
 

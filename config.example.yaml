@@ -1,9 +1,9 @@
-# riftkit Configuration Example
+# riffkit Configuration Example
 # Copy to config.yaml and customize for your setup
 
 paths:
   reaper_projects: "~/music/projects"
-  templates: "~/.config/riftkit/templates"
+  templates: "~/.config/riffkit/templates"
   personal_library: "~/music/riffkit-library"
 
 demucs:

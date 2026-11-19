@@ -132,7 +132,7 @@ style uncertain or sheet-corrected words differently.
 | Output schema + InsertLyrics.lua compatibility | Built, unit-tested |
 | Timestamps for sheet words never transcribed (interpolation) | **Stubbed** — reported in `unmatched_reference_words`, no timing |
 | Audio-only disambiguation of confident mishearings | **Unsolved** — needs a sheet or an LLM rescoring pass (see above) |
-| riftkit.py integration (auto-run after stem split) | **Stubbed** — riftkit.py prints the command to run manually |
+| riffkit.py integration (auto-run after stem split) | **Stubbed** — riffkit.py prints the command to run manually |
 | Multi-candidate ensembling (>2 models / temperature sweep) | Not built — escalation is a 2-candidate compare; the plumbing (candidate_score) generalizes if wanted |
 
 The old `lyrics-sync/transcribe.py` (paid-API placeholder) was removed;

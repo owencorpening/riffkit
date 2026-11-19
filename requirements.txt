@@ -1,4 +1,4 @@
-# Python dependencies for riftkit
+# Python dependencies for riffkit
 # Install with: pip3 install -r requirements.txt
 
 PyYAML>=6.0
@@ -6,7 +6,7 @@ PyYAML>=6.0
 # Needed for --setlist-mode
 numpy>=1.24
 
-# Needed for stem separation (the main riftkit command)
+# Needed for stem separation (the main riffkit command)
 demucs>=4.1
 torchcodec>=0.17
 

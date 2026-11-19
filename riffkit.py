@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 """
-riftkit: MP3 to practice-ready REAPER project
+riffkit: MP3 to practice-ready REAPER project
 
 Usage:
-    ./riftkit.py <song.mp3>
-    ./riftkit.py <song.mp3> --output ~/music/projects
-    ./riftkit.py <song.mp3> --no-lyrics
-    ./riftkit.py <concert.mp3> --split-concert
-    ./riftkit.py <concert.mp3> --split-concert --setlist-mode \
+    ./riffkit.py <song.mp3>
+    ./riffkit.py <song.mp3> --output ~/music/projects
+    ./riffkit.py <song.mp3> --no-lyrics
+    ./riffkit.py <concert.mp3> --split-concert
+    ./riffkit.py <concert.mp3> --split-concert --setlist-mode \
         --song-list setlist.txt --transcript whisper.json
-    ./riftkit.py <concert.mp3> --split-concert --boundaries boundaries.txt
+    ./riffkit.py <concert.mp3> --split-concert --boundaries boundaries.txt
 
 Steps:
     1. Separate stems with Demucs htdemucs_ft (vocals, drums, bass, other)

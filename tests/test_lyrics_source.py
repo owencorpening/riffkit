@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 import lyrics_source as ls
-import riftkit
+import riffkit
 
 # Made-up lyrics only.
 LRC = """\
@@ -148,7 +148,7 @@ def test_explicit_lrc_source_does_not_use_lrclib(tmp_path, monkeypatch):
     assert calls == []
 
 
-# --- Through riftkit.main ----------------------------------------------------
+# --- Through riffkit.main ----------------------------------------------------
 
 def _song_with_stems(tmp_path):
     song = tmp_path / "Teapot Song.opus"
@@ -162,13 +162,13 @@ def _song_with_stems(tmp_path):
 
 def _run_main(song, tmp_path, *extra):
     transcribe = MagicMock(return_value=False)
-    argv = ["riftkit.py", str(song), "--output", str(tmp_path / "out"), *extra]
+    argv = ["riffkit.py", str(song), "--output", str(tmp_path / "out"), *extra]
     with patch("sys.argv", argv), \
-         patch("riftkit.subprocess.run", return_value=MagicMock(returncode=0, stdout="{}")), \
-         patch("riftkit.probe_duration", return_value=20.0), \
-         patch("riftkit.transcribe_vocals", transcribe), \
+         patch("riffkit.subprocess.run", return_value=MagicMock(returncode=0, stdout="{}")), \
+         patch("riffkit.probe_duration", return_value=20.0), \
+         patch("riffkit.transcribe_vocals", transcribe), \
          patch("reaper_project.media_duration", return_value=20.0):
-        riftkit.main()
+        riffkit.main()
     return transcribe
 
 
@@ -403,13 +403,13 @@ def test_main_hears_the_vocals_for_word_times_of_looked_up_lyrics(tmp_path, caps
         ]}]}), encoding="utf-8")
         return True
 
-    with patch("sys.argv", ["riftkit.py", str(song), "--output", str(tmp_path / "out"),
+    with patch("sys.argv", ["riffkit.py", str(song), "--output", str(tmp_path / "out"),
                             "--lyrics-offset", "0"]), \
-         patch("riftkit.subprocess.run", return_value=MagicMock(returncode=0, stdout="{}")), \
-         patch("riftkit.probe_duration", return_value=20.0), \
-         patch("riftkit.transcribe_vocals", side_effect=fake_transcribe) as transcribe, \
+         patch("riffkit.subprocess.run", return_value=MagicMock(returncode=0, stdout="{}")), \
+         patch("riffkit.probe_duration", return_value=20.0), \
+         patch("riffkit.transcribe_vocals", side_effect=fake_transcribe) as transcribe, \
          patch("reaper_project.media_duration", return_value=20.0):
-        riftkit.main()
+        riffkit.main()
 
     transcribe.assert_called_once()
     doc = json.loads((stems_dir / "lyrics.json").read_text(encoding="utf-8"))

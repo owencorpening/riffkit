@@ -36,7 +36,7 @@ REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO))
 
 import reaper_project  # noqa: E402
-import riftkit  # noqa: E402
+import riffkit  # noqa: E402
 
 LOG_FIELDS = [
     "date", "commit", "cpu", "total_mem_mb", "available_mem_mb_at_start",
@@ -247,7 +247,7 @@ def benchmark(song: Path, output_dir: Path, stem_model: str, lyrics_model: str,
     total_start = time.monotonic()
 
     stems_dir, row["stems_seconds"], sampler = _timed(
-        "stems", lambda: riftkit.separate_stems(song, output_dir, model=stem_model))
+        "stems", lambda: riffkit.separate_stems(song, output_dir, model=stem_model))
     row["stems_peak_mb"] = sampler.peak_mb
     lowest.append(sampler.lowest_available_mb)
 
@@ -258,7 +258,7 @@ def benchmark(song: Path, output_dir: Path, stem_model: str, lyrics_model: str,
         transcript = stems_dir / "lyrics.json"
         ok, row["lyrics_seconds"], sampler = _timed(
             "lyrics",
-            lambda: vocals is not None and riftkit.transcribe_vocals(vocals, transcript, model=lyrics_model),
+            lambda: vocals is not None and riffkit.transcribe_vocals(vocals, transcript, model=lyrics_model),
         )
         row["lyrics_peak_mb"] = sampler.peak_mb
         lowest.append(sampler.lowest_available_mb)
@@ -297,8 +297,8 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[1])
     parser.add_argument("song", help="A song file (WAV, MP3, FLAC, M4A, Opus)")
     parser.add_argument("--output", help="Where to write the run (default: a temporary folder, deleted after)")
-    parser.add_argument("--stem-model", default=riftkit.DEMUCS_MODEL)
-    parser.add_argument("--lyrics-model", default=riftkit.LYRICS_MODEL)
+    parser.add_argument("--stem-model", default=riffkit.DEMUCS_MODEL)
+    parser.add_argument("--lyrics-model", default=riffkit.LYRICS_MODEL)
     parser.add_argument("--no-lyrics", action="store_true", help="Time stems and project only")
     parser.add_argument("--log", default=str(REPO / "data" / "benchmarks.csv"),
                         help="CSV log to append to (default: data/benchmarks.csv)")

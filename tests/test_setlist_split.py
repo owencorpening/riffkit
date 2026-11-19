@@ -5,7 +5,7 @@ import pytest
 
 np = pytest.importorskip("numpy")
 
-import riftkit
+import riffkit
 import setlist_split as ss
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
@@ -360,16 +360,16 @@ def test_read_boundaries_file_reads_hand_marked_answer_key():
 
 
 # ---------------------------------------------------------------------------
-# riftkit wiring
+# riffkit wiring
 # ---------------------------------------------------------------------------
 
 def test_cue_split_stops_last_song_at_end_time(tmp_path):
     audio = tmp_path / "show.mp3"
     audio.touch()
     calls = []
-    with patch("riftkit.probe_duration", return_value=1000.0), \
-            patch("riftkit.export_segment", side_effect=lambda a, d, s, e: calls.append((s, e))):
-        riftkit.split_concert_into_songs(
+    with patch("riffkit.probe_duration", return_value=1000.0), \
+            patch("riffkit.export_segment", side_effect=lambda a, d, s, e: calls.append((s, e))):
+        riffkit.split_concert_into_songs(
             audio, tmp_path, song_cues=[(10.0, "A"), (400.0, "B")], end_time=900.0
         )
     assert calls == [(10.0, 400.0), (400.0, 900.0)]
@@ -379,9 +379,9 @@ def test_cue_split_without_end_time_is_unchanged(tmp_path):
     audio = tmp_path / "show.mp3"
     audio.touch()
     calls = []
-    with patch("riftkit.probe_duration", return_value=1000.0), \
-            patch("riftkit.export_segment", side_effect=lambda a, d, s, e: calls.append((s, e))):
-        riftkit.split_concert_into_songs(audio, tmp_path, song_cues=[(10.0, "A"), (400.0, "B")])
+    with patch("riffkit.probe_duration", return_value=1000.0), \
+            patch("riffkit.export_segment", side_effect=lambda a, d, s, e: calls.append((s, e))):
+        riffkit.split_concert_into_songs(audio, tmp_path, song_cues=[(10.0, "A"), (400.0, "B")])
     assert calls == [(10.0, 400.0), (400.0, 1000.0)]
 
 
@@ -393,9 +393,9 @@ def test_split_concert_by_setlist_writes_boundaries_and_uses_cue_path(tmp_path):
     fake = ss.SetlistSplit(titles=["First", "Second"], starts=[5.0, 200.0], end=390.0)
     calls = []
     with patch("setlist_split.detect_setlist_boundaries", return_value=fake), \
-            patch("riftkit.probe_duration", return_value=400.0), \
-            patch("riftkit.export_segment", side_effect=lambda a, d, s, e: calls.append((d.name, s, e))):
-        split_dir = riftkit.split_concert_by_setlist(audio, tmp_path, setlist)
+            patch("riffkit.probe_duration", return_value=400.0), \
+            patch("riffkit.export_segment", side_effect=lambda a, d, s, e: calls.append((d.name, s, e))):
+        split_dir = riffkit.split_concert_by_setlist(audio, tmp_path, setlist)
     assert calls == [("01 - First.mp3", 5.0, 200.0), ("02 - Second.mp3", 200.0, 390.0)]
     assert "2   3:20.0    6:30.0    ok     Second" in (split_dir / "boundaries.txt").read_text()
 
@@ -404,9 +404,9 @@ def test_song_segments_are_exported_as_given(tmp_path):
     audio = tmp_path / "show.mp3"
     audio.touch()
     calls = []
-    with patch("riftkit.probe_duration", return_value=1000.0), \
-            patch("riftkit.export_segment", side_effect=lambda a, d, s, e: calls.append((d.name, s, e))):
-        riftkit.split_concert_into_songs(
+    with patch("riffkit.probe_duration", return_value=1000.0), \
+            patch("riffkit.export_segment", side_effect=lambda a, d, s, e: calls.append((d.name, s, e))):
+        riffkit.split_concert_into_songs(
             audio, tmp_path, song_segments=[(10.0, 380.0, "A"), (400.0, 900.0, "B")]
         )
     assert calls == [("01 - A.mp3", 10.0, 380.0), ("02 - B.mp3", 400.0, 900.0)]
@@ -424,9 +424,9 @@ def test_split_concert_by_boundaries_runs_no_detection(tmp_path):
     )
     calls = []
     with patch("setlist_split.detect_setlist_boundaries", side_effect=AssertionError("detection ran")), \
-            patch("riftkit.probe_duration", return_value=400.0), \
-            patch("riftkit.export_segment", side_effect=lambda a, d, s, e: calls.append((d.name, s, e))):
-        riftkit.split_concert_by_boundaries(audio, tmp_path, boundaries)
+            patch("riffkit.probe_duration", return_value=400.0), \
+            patch("riffkit.export_segment", side_effect=lambda a, d, s, e: calls.append((d.name, s, e))):
+        riffkit.split_concert_by_boundaries(audio, tmp_path, boundaries)
     assert calls == [("01 - First.mp3", 60.0, 190.0), ("02 - Second.mp3", 200.0, 390.0)]
 
 
@@ -434,7 +434,7 @@ def test_split_concert_by_setlist_needs_a_setlist(tmp_path):
     audio = tmp_path / "show.mp3"
     audio.touch()
     with pytest.raises(RuntimeError, match="setlist file"):
-        riftkit.split_concert_by_setlist(audio, tmp_path, tmp_path / "missing.txt")
+        riffkit.split_concert_by_setlist(audio, tmp_path, tmp_path / "missing.txt")
 
 
 # ---------------------------------------------------------------------------

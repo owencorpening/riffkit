@@ -103,17 +103,17 @@ def test_benchmark_runs_the_chain_and_logs(tmp_path):
         return True
 
     log = tmp_path / "bench.csv"
-    with patch.object(benchmark.riftkit, "separate_stems", side_effect=fake_separate), \
-            patch.object(benchmark.riftkit, "transcribe_vocals", side_effect=fake_transcribe):
+    with patch.object(benchmark.riffkit, "separate_stems", side_effect=fake_separate), \
+            patch.object(benchmark.riffkit, "transcribe_vocals", side_effect=fake_transcribe):
         code = benchmark.main([str(song), "--output", str(out), "--log", str(log)])
 
     assert code == 0
     row = list(csv.DictReader(log.open()))[0]
     assert row["song"] == "Song.wav"
     assert row["checks"] == "ok"
-    assert row["stem_model"] == benchmark.riftkit.DEMUCS_MODEL
+    assert row["stem_model"] == benchmark.riffkit.DEMUCS_MODEL
     assert float(row["total_seconds"]) >= 0
-    assert (out / benchmark.riftkit.DEMUCS_MODEL / "Song" / "Song.RPP").exists()
+    assert (out / benchmark.riffkit.DEMUCS_MODEL / "Song" / "Song.RPP").exists()
 
 
 def test_benchmark_reports_failure_and_cleans_temporary_output(tmp_path):
@@ -125,7 +125,7 @@ def test_benchmark_reports_failure_and_cleans_temporary_output(tmp_path):
         return _stems(output_dir / model / audio.stem, silent=("bass",))
 
     log = tmp_path / "bench.csv"
-    with patch.object(benchmark.riftkit, "separate_stems", side_effect=fake_separate):
+    with patch.object(benchmark.riffkit, "separate_stems", side_effect=fake_separate):
         code = benchmark.main([str(song), "--no-lyrics", "--log", str(log)])
 
     assert code == 1

@@ -12,7 +12,7 @@ Use this when you have a single song file and want a Demucs stem folder plus the
 From the repo root:
 
 ```bash
-.venv/bin/python riftkit.py "/path/to/song.mp3" --output "/home/owen/Music/riffkit-runs/song-name" --no-lyrics
+.venv/bin/python riffkit.py "/path/to/song.mp3" --output "/home/owen/Music/riffkit-runs/song-name" --no-lyrics
 ```
 
 ## Expected Output

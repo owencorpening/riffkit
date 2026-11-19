@@ -35,7 +35,7 @@ Tell the user before you start.
 **One song** (the usual case):
 
 ```bash
-.venv/bin/python riftkit.py "<song file>" --output "<output folder>"
+.venv/bin/python riffkit.py "<song file>" --output "<output folder>"
 ```
 
 Prints the path of the `.RPP` to open in REAPER. Expect several minutes per
@@ -45,7 +45,7 @@ REAPER before running a batch.
 **A concert, split by pauses**, then each song as above:
 
 ```bash
-.venv/bin/python riftkit.py "<concert file>" --split-concert --output "<songs folder>"
+.venv/bin/python riffkit.py "<concert file>" --split-concert --output "<songs folder>"
 ```
 
 **A concert, split by setlist:** needs a setlist file (format in README.md)
@@ -53,7 +53,7 @@ and a transcript of the concert:
 
 ```bash
 .venv/bin/python scripts/transcribe_concert.py "<concert file>" "<concert>.json"
-.venv/bin/python riftkit.py "<concert file>" --split-concert --setlist-mode \
+.venv/bin/python riffkit.py "<concert file>" --split-concert --setlist-mode \
     --song-list "<setlist.txt>" --transcript "<concert>.json" --output "<songs folder>"
 ```
 

@@ -82,7 +82,7 @@ python3 -m venv .venv
 **A song to a REAPER project** (the usual case; no concert needed):
 
 ```bash
-.venv/bin/python riftkit.py "My Song.wav" --output ~/riffkit-projects
+.venv/bin/python riffkit.py "My Song.wav" --output ~/riffkit-projects
 ```
 
 Then open `~/riffkit-projects/htdemucs_ft/My Song/My Song.RPP` in REAPER.
@@ -92,14 +92,14 @@ gets its own folder and its own project.
 **A concert, split by pauses:**
 
 ```bash
-.venv/bin/python riftkit.py concert.mp3 --split-concert --output ~/riffkit-songs
+.venv/bin/python riffkit.py concert.mp3 --split-concert --output ~/riffkit-songs
 ```
 
 **A concert, split by its setlist:**
 
 ```bash
 .venv/bin/python scripts/transcribe_concert.py concert.mp3 concert.json
-.venv/bin/python riftkit.py concert.mp3 --split-concert --setlist-mode \
+.venv/bin/python riffkit.py concert.mp3 --split-concert --setlist-mode \
     --song-list setlist.txt --transcript concert.json --output ~/riffkit-songs
 ```
 
@@ -108,7 +108,7 @@ the `CHECK` ones, correct any time in the written `boundaries.txt`, and
 re-cut without detection:
 
 ```bash
-.venv/bin/python riftkit.py concert.mp3 --split-concert \
+.venv/bin/python riffkit.py concert.mp3 --split-concert \
     --boundaries ~/riffkit-songs/concert_songs/boundaries.txt --output ~/riffkit-songs
 ```
 
@@ -132,7 +132,7 @@ riffkit takes the first of these that works:
 Artist and title come from the file's tags, or give them yourself:
 
 ```bash
-.venv/bin/python riftkit.py "Song.opus" --artist "Some Band" --title "Some Song"
+.venv/bin/python riffkit.py "Song.opus" --artist "Some Band" --title "Some Song"
 ```
 
 Timed lyrics are made for one copy of a recording, and another upload of
@@ -257,7 +257,7 @@ TV for rehearsal.
 
 | Path | What it is |
 | :--- | :--- |
-| `riftkit.py` | The main command. |
+| `riffkit.py` | The main command. |
 | `setlist_split.py` | Setlist-mode song splitting. |
 | `reaper_project.py` | Writes the REAPER project. |
 | `scripts/transcribe_concert.py` | Whisper transcript of a whole concert, in 10-minute pieces. |

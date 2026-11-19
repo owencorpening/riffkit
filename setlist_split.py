@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-Setlist-mode concert splitting for riftkit.
+Setlist-mode concert splitting for riffkit.
 
-Pause detection (riftkit.detect_silence_intervals) needs a long, near-silent
+Pause detection (riffkit.detect_silence_intervals) needs a long, near-silent
 gap between songs. Live shows rarely give it one: the breaks are full of crowd
 noise, tuning and stage talk, and some songs run straight into the next.
 

@@ -27,7 +27,7 @@ A small church band that receives a short set of songs ahead of time and needs t
 
 ### Relevant files
 
-* `riftkit.py`
+* `riffkit.py`
 * `stem-separation/import_stems.lua`
 * `lyrics-sync/InsertLyrics.lua`
 * `lyrics-sync/AddLyrics.lua`
@@ -57,7 +57,7 @@ A single musician who wants to practice one part of a song without losing the co
 
 ### Relevant files
 
-* `riftkit.py`
+* `riffkit.py`
 * `stem-separation/README.md`
 * `stem-separation/import_stems.lua`
 * `scripts/reaper/quick_master_bus_toggle.lua`
@@ -88,7 +88,7 @@ A band, church team, or engineer who has a long concert recording and needs to s
 
 ### Relevant files
 
-* `riftkit.py`
+* `riffkit.py`
 
 ## 4. Live Performance With Lyrics
 

@@ -42,11 +42,11 @@ pip install demucs
 
 #### Option A: Automated (recommended)
 
-Run `riftkit.py` from the repo root. It separates the stems (model
+Run `riffkit.py` from the repo root. It separates the stems (model
 `htdemucs_ft`, WAV output) and writes a project file next to them:
 
 ```bash
-./riftkit.py song.mp3 --output ~/music/projects
+./riffkit.py song.mp3 --output ~/music/projects
 ```
 
 Open `~/music/projects/htdemucs_ft/song/song.RPP` in REAPER. The four stems

@@ -46,7 +46,7 @@ WAV, MP3, FLAC, M4A and Opus.
 Turn the song into a REAPER project:
 
 ```bash
-.venv/bin/python riftkit.py "<song file>" --output <dir>
+.venv/bin/python riffkit.py "<song file>" --output <dir>
 ```
 
 See [Stem Separation](stem-separation.md) for the details.

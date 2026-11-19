@@ -1,4 +1,4 @@
-# riftkit .gitignore
+# riffkit .gitignore
 # Keep the repo lean - only code, docs, and templates
 
 # Audio Files (NEVER commit these - they're huge)
