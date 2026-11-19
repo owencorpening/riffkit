@@ -145,12 +145,14 @@
       <button id="back" class="big">« 5 s</button>
       <button id="play" class="big primary">Play</button>
     </div>
-    <h2>Speed</h2>
-    <div class="row">
-      <button id="slower">Slower</button>
-      <button id="normal">Reset</button>
-      <button id="faster">Faster</button>
-    </div>
+    <details id="speed-box" open>
+      <summary><h2>Speed</h2></summary>
+      <div class="row">
+        <button id="slower">Slower</button>
+        <button id="normal">Reset</button>
+        <button id="faster">Faster</button>
+      </div>
+    </details>
   </section>
 
   <section>
@@ -192,7 +194,7 @@
 
 <script>
 /* Runs first, so it also catches errors in the scripts below. */
-var PAGE_VERSION = "remote 7 (2026-11-19, Mute twisty)";
+var PAGE_VERSION = "remote 8 (2026-11-19, Speed twisty)";
 var PAGE_LOADED = new Date();
 function diagTime(d) { return d.toTimeString().slice(0, 8); }
 document.getElementById("diag-version").textContent =
@@ -542,6 +544,7 @@ function rememberOpen(id, key) {
 }
 rememberOpen("loop-box", "riffkit-remote-loop-open");
 rememberOpen("mute-box", "riffkit-remote-mute-open");
+rememberOpen("speed-box", "riffkit-remote-speed-open");
 
 const src = new URLSearchParams(location.search).get("src");
 if (src) {
