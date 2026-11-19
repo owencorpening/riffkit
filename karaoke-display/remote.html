@@ -104,6 +104,18 @@
   #mutes .original { grid-column: 1 / -1; }
   .hidden { display: none !important; }
 
+  /* Diagnostics footer: version, page load time, last command, errors. */
+  #diag {
+    grid-column: 1 / -1;
+    font: 0.8rem/1.5 ui-monospace, monospace;
+    color: var(--dim);
+    border-top: 1px solid var(--button);
+    padding-top: 0.6rem;
+    word-break: break-all;
+    user-select: text;
+  }
+  #diag .err { color: var(--muted); }
+
   /* Landscape: two columns side by side, still thumb-sized. */
   @media (orientation: landscape) and (min-width: 600px) {
     main {
@@ -163,7 +175,31 @@
     <h2>Mute</h2>
     <div id="mutes"></div>
   </section>
+  <div id="diag">
+    <div id="diag-version"></div>
+    <div id="diag-sent">Last sent: nothing yet</div>
+    <div id="diag-error" class="err"></div>
+  </div>
 </main>
+
+<script>
+/* Runs first, so it also catches errors in the scripts below. */
+var PAGE_VERSION = "remote 4 (2026-11-19, diagnostics)";
+var PAGE_LOADED = new Date();
+function diagTime(d) { return d.toTimeString().slice(0, 8); }
+document.getElementById("diag-version").textContent =
+  PAGE_VERSION + " | loaded " + diagTime(PAGE_LOADED);
+function diagError(message) {
+  var box = document.getElementById("diag-error");
+  if (!box.textContent) box.textContent = "Error: " + message;
+}
+window.addEventListener("error", function (e) {
+  diagError((e.message || "unknown") + " (line " + (e.lineno || "?") + ")");
+});
+window.addEventListener("unhandledrejection", function (e) {
+  diagError(String(e.reason));
+});
+</script>
 
 <script id="loop-math">
 "use strict";
@@ -297,9 +333,18 @@ const state = {
 };
 
 function send(commands) {
-  return fetch("/_/" + commands.join(";"))
-    .then((r) => r.text())
-    .catch(() => "");
+  const text = commands.join(";");
+  const line = $("diag-sent");
+  line.textContent = `Last sent ${diagTime(new Date())}: ${text} …`;
+  return fetch("/_/" + text)
+    .then((r) => {
+      line.textContent = `Last sent ${diagTime(new Date())}: ${text} -> HTTP ${r.status}`;
+      return r.text();
+    })
+    .catch((e) => {
+      line.textContent = `Last sent ${diagTime(new Date())}: ${text} -> failed (${e.message})`;
+      return "";
+    });
 }
 
 /* ---------------- reading REAPER ---------------- */
