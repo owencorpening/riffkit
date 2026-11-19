@@ -74,7 +74,8 @@ instead, so ad-hoc use needs no file copying at all.
 `remote.html` is a phone remote for one riffkit project, served by REAPER
 the same way. It uses only the commands REAPER's own web pages use.
 
-- Transport: Start, back 5 s, forward 5 s, End, Stop and Play/Pause.
+- Transport: Start, back 5 s, forward 5 s, End and Play/Pause (no Stop:
+  loops and the jump buttons cover going back).
 - Speed: Slower / Faster in 5% steps (50% to 150%) and 100%. Pitch stays
   the same. REAPER can't tell a web page the current speed, so the page
   sets 100% when it opens and always shows the speed it last set.
