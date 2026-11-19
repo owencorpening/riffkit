@@ -291,3 +291,115 @@ def measure_offset_from_audio(vocals: Path, segments: list[dict]) -> tuple[float
     except (TypeError, ValueError):
         return None, "could not read the vocals"
     return measure_offset(frame_levels_db(samples, sample_rate), segments)
+
+
+# --- Word times for text lyrics -----------------------------------------------
+#
+# Lyrics from an .lrc file or LRCLIB have line times only. Whisper's heard
+# words (from the vocals stem) carry word times but often the wrong words, so
+# each line keeps its own words and borrows the heard times where the words
+# match, using the same normalising and matching as scripts/compare_lyrics.py.
+
+WORD_SLACK = 0.5      # heard words this far outside a line still count for it
+MIN_WORD_GAP = 0.01   # each word starts at least this long after the one before
+
+_WORD_RE = re.compile(r"[\w']+")
+
+
+def normalize(text: str) -> list[str]:
+    """Lowercase words with punctuation removed (as in scripts/compare_lyrics.py)."""
+    words = []
+    for token in _WORD_RE.findall(text.lower()):
+        token = token.strip("'")
+        if token:
+            words.append(token)
+    return words
+
+
+def heard_words(doc: dict) -> list[tuple[float, str]]:
+    """(start, word) for every timed word in a heard transcript, by time."""
+    words = []
+    for seg in doc.get("segments") or []:
+        for w in seg.get("words") or []:
+            if w.get("start") is not None and str(w.get("word", "")).strip():
+                words.append((float(w["start"]), str(w["word"])))
+    words.sort(key=lambda w: w[0])
+    return words
+
+
+def _spread(lengths: list[int], start: float, end: float) -> list[float]:
+    """Start times for words sharing [start, end] in proportion to their length."""
+    total = sum(lengths) or 1
+    times, done = [], 0
+    for n in lengths:
+        times.append(start + (end - start) * done / total)
+        done += n
+    return times
+
+
+def time_line_words(line: dict, heard: list[tuple[float, str]]) -> tuple[list[dict], int]:
+    """(words with start times, how many of them took a heard time) for one line."""
+    import difflib
+
+    words = line["text"].split()
+    if not words:
+        return [], 0
+    start, end = float(line["start"]), float(line["end"])
+    end = max(end, start)
+
+    # Normalised tokens of the line's words, each remembering its word.
+    tokens, owner = [], []
+    for i, w in enumerate(words):
+        for t in normalize(w):
+            tokens.append(t)
+            owner.append(i)
+    near = [(t, w) for t, w in heard if start - WORD_SLACK <= t <= end + WORD_SLACK]
+    heard_tokens, heard_times = [], []
+    for t, w in near:
+        for tok in normalize(w):
+            heard_tokens.append(tok)
+            heard_times.append(t)
+
+    times: list[float | None] = [None] * len(words)
+    matcher = difflib.SequenceMatcher(None, tokens, heard_tokens, autojunk=False)
+    for tag, i1, i2, j1, _ in matcher.get_opcodes():
+        if tag == "equal":
+            for k in range(i2 - i1):
+                i = owner[i1 + k]
+                if times[i] is None:
+                    times[i] = min(max(heard_times[j1 + k], start), end)
+    matched = sum(t is not None for t in times)
+
+    lengths = [max(1, len("".join(normalize(w)))) for w in words]
+    if matched == 0:
+        step = (end - start) / len(words)
+        times = [start + step * i for i in range(len(words))]
+    else:
+        anchors = [i for i, t in enumerate(times) if t is not None]
+        # Words before the first match share [line start, first match].
+        first = anchors[0]
+        if first:
+            times[:first] = _spread(lengths[:first], start, times[first])
+        # Words after a match share its slot with it, up to the next match
+        # (or the line's end).
+        for a, b in zip(anchors, anchors[1:] + [len(words)]):
+            if b - a > 1:
+                stop = times[b] if b < len(words) else end
+                stop = max(stop, times[a])
+                times[a:b] = [times[a]] + _spread(lengths[a:b], times[a], stop)[1:]
+
+    for i in range(1, len(times)):
+        times[i] = max(times[i], times[i - 1] + MIN_WORD_GAP)
+    times = [round(t, 3) for t in times]
+    return [{"word": " " + w, "start": t} for w, t in zip(words, times)], matched
+
+
+def add_word_times(segments: list[dict], heard: list[tuple[float, str]]) -> tuple[list[dict], int, int]:
+    """(segments with words[], words with heard times, words spread) for text lyrics."""
+    out, matched, spread = [], 0, 0
+    for seg in segments:
+        words, n = time_line_words(seg, heard)
+        out.append({**seg, "words": words})
+        matched += n
+        spread += len(words) - n
+    return out, matched, spread

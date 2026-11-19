@@ -176,7 +176,7 @@ def test_main_uses_lrc_next_to_song_and_applies_the_offset(tmp_path, capsys):
     song, stems_dir = _song_with_stems(tmp_path)
     (tmp_path / "Teapot Song.lrc").write_text(LRC, encoding="utf-8")
 
-    transcribe = _run_main(song, tmp_path, "--lyrics-offset", "-0.6")
+    transcribe = _run_main(song, tmp_path, "--lyrics-offset", "-0.6", "--no-word-times")
 
     transcribe.assert_not_called()
     doc = json.loads((stems_dir / "lyrics.json").read_text(encoding="utf-8"))
@@ -284,3 +284,145 @@ def test_main_does_not_measure_heard_lyrics(tmp_path):
     with patch("lyrics_source.measure_offset_from_audio") as measure:
         _run_main(song, tmp_path, "--lyrics-from", "hear")
     measure.assert_not_called()
+
+
+# --- Word times for text lyrics ----------------------------------------------
+# Made-up words and made-up heard words.
+
+def _line(text, start, end):
+    return {"start": start, "end": end, "text": " " + text, "words": []}
+
+
+def _starts(words):
+    return [w["start"] for w in words]
+
+
+def _increasing(words):
+    return all(b > a for a, b in zip(_starts(words), _starts(words)[1:]))
+
+
+def test_all_words_matched_take_the_heard_times():
+    heard = [(10.2, " The"), (10.5, " blue"), (10.9, " kettle,"), (11.6, " sings!")]
+    words, n = ls.time_line_words(_line("the Blue kettle sings", 10.0, 14.0), heard)
+    assert n == 4
+    assert [w["word"] for w in words] == [" the", " Blue", " kettle", " sings"]
+    assert _starts(words) == [10.2, 10.5, 10.9, 11.6]
+
+
+def test_missed_words_are_spread_between_matches_by_length():
+    # "kettle" (6 letters) and "sings" (5) were misheard between "blue" and "at".
+    heard = [(10.0, " the"), (10.4, " blue"), (11.0, " cattle"), (11.5, " springs"), (12.6, " at")]
+    words, n = ls.time_line_words(_line("the blue kettle sings at", 10.0, 14.0), heard)
+    assert n == 3
+    # blue (4), kettle (6), sings (5) share 10.4 .. 12.6 (2.2 s over 15 letters)
+    assert _starts(words) == pytest.approx([10.0, 10.4, 10.4 + 2.2 * 4 / 15, 10.4 + 2.2 * 10 / 15, 12.6], abs=0.001)
+    assert _increasing(words)
+
+
+def test_missed_words_at_the_start_and_end_fill_out_the_line():
+    heard = [(11.0, " kettle")]
+    words, n = ls.time_line_words(_line("the blue kettle sings", 10.0, 14.0), heard)
+    assert n == 1
+    assert words[0]["start"] == 10.0          # the first word starts with the line
+    assert words[2]["start"] == 11.0
+    assert 11.0 < words[3]["start"] < 14.0
+    assert _increasing(words)
+
+
+def test_a_line_with_no_matches_is_spread_evenly():
+    heard = [(10.3, " something"), (11.0, " else")]
+    words, n = ls.time_line_words(_line("we walk the road", 10.0, 14.0), heard)
+    assert n == 0
+    assert _starts(words) == [10.0, 11.0, 12.0, 13.0]
+
+
+def test_repeated_chorus_lines_each_use_their_own_heard_words():
+    heard = [(20.1, " la"), (20.6, " di"), (21.0, " da"),
+             (30.3, " la"), (30.7, " di"), (31.2, " da")]
+    segments = [_line("la di da", 20.0, 23.0), _line("la di da", 30.0, 33.0)]
+    out, matched, spread = ls.add_word_times(segments, heard)
+    assert (matched, spread) == (6, 0)
+    assert _starts(out[0]["words"]) == [20.1, 20.6, 21.0]
+    assert _starts(out[1]["words"]) == [30.3, 30.7, 31.2]
+
+
+def test_heard_words_within_half_a_second_of_the_line_count():
+    line = _line("hum along", 10.0, 12.0)
+    # 0.4 s early: used, but the first word still starts with the line.
+    words, n = ls.time_line_words(line, [(9.6, " hum"), (10.8, " along")])
+    assert n == 2 and _starts(words) == [10.0, 10.8]
+    # 0.6 s early or late: not used.
+    words, n = ls.time_line_words(line, [(9.4, " hum"), (12.6, " along")])
+    assert n == 0
+
+
+def test_times_always_increase_even_when_heard_times_bunch_up():
+    heard = [(10.5, " one"), (10.5, " two"), (10.5, " three"), (10.5, " four")]
+    words, n = ls.time_line_words(_line("one two three four five", 10.0, 11.0), heard)
+    assert n == 4
+    assert words[0]["start"] >= 10.0
+    assert _increasing(words)
+
+
+def test_word_times_keep_line_times_and_text():
+    segments = [_line("the blue kettle", 5.0, 9.0)]
+    out, _, _ = ls.add_word_times(segments, [(5.2, " blue")])
+    assert (out[0]["start"], out[0]["end"], out[0]["text"]) == (5.0, 9.0, " the blue kettle")
+    assert segments[0]["words"] == []  # the input is left alone
+
+
+def test_heard_words_reads_a_transcript_in_time_order():
+    doc = {"segments": [
+        {"words": [{"word": " b", "start": 2.0, "end": 2.5}, {"word": " ", "start": 2.6}]},
+        {"words": [{"word": " a", "start": 1.0, "end": 1.5}]},
+    ]}
+    assert ls.heard_words(doc) == [(1.0, " a"), (2.0, " b")]
+
+
+def test_normalize_matches_compare_lyrics():
+    import importlib.util
+    import sys
+    root = Path(__file__).resolve().parent.parent
+    spec = importlib.util.spec_from_file_location("compare_lyrics", root / "scripts" / "compare_lyrics.py")
+    cl = importlib.util.module_from_spec(spec)
+    sys.modules["compare_lyrics"] = cl
+    spec.loader.exec_module(cl)
+    for text in ["Don't STOP, 'til dawn!", "rock-n-roll  ...  O'Malley's", "  "]:
+        assert ls.normalize(text) == cl.normalize(text)
+
+
+def test_main_hears_the_vocals_for_word_times_of_looked_up_lyrics(tmp_path, capsys):
+    song, stems_dir = _song_with_stems(tmp_path)
+    (tmp_path / "Teapot Song.lrc").write_text(LRC, encoding="utf-8")
+
+    def fake_transcribe(vocals, output, model="medium"):
+        assert vocals.name == "vocals.wav"
+        Path(output).write_text(json.dumps({"segments": [{"words": [
+            {"word": " blue", "start": 5.6}, {"word": " kettle", "start": 6.0},
+            {"word": " walk", "start": 10.2},
+        ]}]}), encoding="utf-8")
+        return True
+
+    with patch("sys.argv", ["riftkit.py", str(song), "--output", str(tmp_path / "out"),
+                            "--lyrics-offset", "0"]), \
+         patch("riftkit.subprocess.run", return_value=MagicMock(returncode=0, stdout="{}")), \
+         patch("riftkit.probe_duration", return_value=20.0), \
+         patch("riftkit.transcribe_vocals", side_effect=fake_transcribe) as transcribe, \
+         patch("reaper_project.media_duration", return_value=20.0):
+        riftkit.main()
+
+    transcribe.assert_called_once()
+    doc = json.loads((stems_dir / "lyrics.json").read_text(encoding="utf-8"))
+    first = doc["segments"][0]
+    assert (first["start"], first["text"]) == (5.1, " The blue kettle sings at noon")
+    assert [w["start"] for w in first["words"]][1:3] == [5.6, 6.0]
+    assert "Word times: 3 of 12 words took heard times, 9 spread" in capsys.readouterr().out
+
+
+def test_main_no_word_times_keeps_line_times_only(tmp_path):
+    song, stems_dir = _song_with_stems(tmp_path)
+    (tmp_path / "Teapot Song.lrc").write_text(LRC, encoding="utf-8")
+    transcribe = _run_main(song, tmp_path, "--lyrics-offset", "0", "--no-word-times")
+    transcribe.assert_not_called()
+    doc = json.loads((stems_dir / "lyrics.json").read_text(encoding="utf-8"))
+    assert all(s["words"] == [] for s in doc["segments"])

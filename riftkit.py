@@ -521,6 +521,26 @@ def split_concert_by_boundaries(audio_file: Path, output_dir: Path, boundaries_f
     return split_concert_into_songs(audio_file, output_dir, song_segments=segments)
 
 
+def add_word_times(lyrics_json: Path, stems_dir: Path) -> None:
+    """Give text lyrics (line times only) word times heard in the vocals stem."""
+    import lyrics_source
+    import reaper_project
+
+    vocals = reaper_project.match_stem_files(stems_dir).get("Vocals")
+    heard_json = stems_dir / "lyrics_heard.json"
+    print("  Word times: hearing the vocals stem for word timing")
+    if vocals is None or not transcribe_vocals(vocals, heard_json):
+        print("  Word times: could not hear the vocals; lyrics have line times only")
+        return
+    heard = lyrics_source.heard_words(json.loads(heard_json.read_text(encoding="utf-8")))
+    doc = json.loads(lyrics_json.read_text(encoding="utf-8"))
+    doc["segments"], matched, spread = lyrics_source.add_word_times(doc.get("segments") or [], heard)
+    lyrics_json.write_text(json.dumps(doc, ensure_ascii=False, indent=2), encoding="utf-8")
+    total = matched + spread
+    print(f"  Word times: {matched} of {total} words took heard times, {spread} spread "
+          f"between them")
+
+
 def add_lyrics(audio_file: Path, stems_dir: Path, rpp_path: Path, args) -> None:
     """Find or hear the lyrics, write lyrics.json and add a Lyrics track."""
     import lyrics_source
@@ -574,6 +594,9 @@ def add_lyrics(audio_file: Path, stems_dir: Path, rpp_path: Path, args) -> None:
         lyrics_json.write_text(json.dumps(doc, ensure_ascii=False, indent=2), encoding="utf-8")
         print(f"  Lyrics shifted by {offset:+g} s")
 
+    if segments and not args.no_word_times:
+        add_word_times(lyrics_json, stems_dir)
+
     reaper_project.write_reaper_project(
         rpp_path, stems_dir, original=audio_file,
         lyrics=reaper_project.load_lyrics(lyrics_json),
@@ -591,6 +614,11 @@ def main():
     )
     parser.add_argument(
         "--no-lyrics", action="store_true", help="Skip lyrics entirely"
+    )
+    parser.add_argument(
+        "--no-word-times", action="store_true",
+        help="For looked-up lyrics, keep line times only (skip hearing the vocals "
+             "for word-by-word timing)",
     )
     parser.add_argument(
         "--lyrics-from",
