@@ -141,10 +141,17 @@ the same song can start a little earlier or later. So for lyrics from a
 vocals stem and shifts every line to match (it prints the amount, and
 leaves the lyrics alone when they already line up or the lines disagree).
 
+Those lyrics have a time for each line only, so riffkit also hears the
+vocals stem and gives each word the time it was heard. Words Whisper
+missed are spaced out between the ones it caught. This lets the karaoke
+display light up the words one by one, and takes about as long as hearing
+the lyrics would. riffkit prints how many words got a heard time.
+
 Other options: `--lyrics-from auto|lrc|lrclib|hear` picks one source
 (default `auto`, the order above), `--lyrics-offset 0.3` sets the shift
 yourself instead (later by 0.3 seconds; negative is earlier; `0` turns the
-automatic shift off), and `--no-lyrics` skips lyrics. riffkit prints which
+automatic shift off), `--no-word-times` keeps line times only (no
+hearing, so it is faster), and `--no-lyrics` skips lyrics. riffkit prints which
 source it used.
 
 **Lyrics are for your own use.** riffkit fetches lyrics only for the
