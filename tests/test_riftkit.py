@@ -520,7 +520,8 @@ def test_main_puts_transcribed_lyrics_on_a_lyrics_track(tmp_path):
 
     text = (stems_dir / "song.RPP").read_text()
     assert text.count("<TRACK") == 6
-    assert "|Hey Joe" in text.rsplit("<TRACK", 1)[1]
+    lyrics_track = text.split("<TRACK")[2]  # second track, right after Vocals
+    assert 'NAME "Lyrics"' in lyrics_track and "|Hey Joe" in lyrics_track
 
 
 def test_transcribe_vocals_runs_medium_single_pass(tmp_path):

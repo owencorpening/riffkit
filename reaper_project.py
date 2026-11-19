@@ -187,10 +187,10 @@ def write_reaper_project(
 ) -> Path:
     """Write ``project_file`` with the stems in ``stems_dir`` on named tracks.
 
-    ``original`` is the unseparated song; it goes on a muted fifth track.
+    ``original`` is the unseparated song; it goes on a muted last track.
     ``length_seconds`` is the item length; measured from the first stem when
     not given. ``lyrics`` is a list of transcript segments (start, end,
-    text); they go on a last track named Lyrics. Raises FileNotFoundError if
+    text); they go on a track named Lyrics, second, right after Vocals. Raises FileNotFoundError if
     no stem files are found.
     """
     project_file = Path(project_file)
@@ -203,16 +203,16 @@ def write_reaper_project(
         length_seconds = media_duration(next(iter(stems.values())))
     project_dir = project_file.parent.resolve()
 
-    blocks = [
-        _track_block(track, stems.get(track), project_dir, length_seconds)
-        for track, _ in STEM_TRACKS
-    ]
+    blocks = []
+    for track, _ in STEM_TRACKS:
+        blocks.append(_track_block(track, stems.get(track), project_dir, length_seconds))
+        if track == "Vocals" and lyrics:
+            # Lyrics right under the vocals they belong to.
+            blocks.append(_lyrics_track_block(lyrics))
     if original is not None:
         original = playable_original(Path(original).resolve(), project_dir)
         blocks.append(_track_block("Original", original, project_dir,
                                    length_seconds, muted=True))
-    if lyrics:
-        blocks.append(_lyrics_track_block(lyrics))
 
     text = "\n".join([
         "<REAPER_PROJECT 0.1 \"7.0\" 0",

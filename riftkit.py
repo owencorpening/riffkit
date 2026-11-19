@@ -709,8 +709,9 @@ Done!
   Stems:    {stems_dir}
   Project:  {rpp_path}
 
-Open {rpp_path.name} in REAPER. The four stems are on their tracks and the
-original mix is on a muted fifth track.
+Open {rpp_path.name} in REAPER. The four stems are on their tracks, the
+lyrics are on the Lyrics track under Vocals, and the original mix is on a
+muted last track.
 """)
 
 

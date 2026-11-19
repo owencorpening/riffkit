@@ -50,7 +50,7 @@ Run `riftkit.py` from the repo root. It separates the stems (model
 ```
 
 Open `~/music/projects/htdemucs_ft/song/song.RPP` in REAPER. The four stems
-are on their tracks and the original song is on a muted fifth track, so
+are on their tracks and the original song is on a muted last track, so
 you can switch between the mix and the parts. Nothing to import.
 
 Other models: `--stem-model htdemucs` is about four times faster and
