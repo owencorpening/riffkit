@@ -64,13 +64,18 @@
     cursor: pointer;
   }
   summary::-webkit-details-marker { display: none; }
-  summary::after {
-    content: "▸";
-    color: var(--dim);
-    font-size: 1rem;
-    transition: transform 120ms;
+  /* Twisty: points right when folded, down when open. */
+  summary::before {
+    content: "";
+    width: 0; height: 0;
+    border-style: solid;
+    border-width: 0.55rem 0 0.55rem 0.8rem;
+    border-color: transparent transparent transparent var(--accent);
+    transition: transform 150ms;
+    flex: none;
   }
-  details[open] > summary::after { transform: rotate(90deg); }
+  details[open] > summary::before { transform: rotate(90deg); }
+  summary h2 { color: var(--text); font-size: 1rem; }
 
   h2 { font-size: 0.85rem; font-weight: 600; color: var(--dim); text-transform: uppercase; letter-spacing: 0.08em; }
   .row { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 0.5rem; }
