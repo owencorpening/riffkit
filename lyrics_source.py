@@ -197,3 +197,97 @@ def find_lyrics(
         return None, note
 
     return None, "hearing the lyrics was requested"
+
+
+# --- Automatic offset ----------------------------------------------------------
+#
+# LRC timings are made for one copy of a recording; another upload of the same
+# song can have a slightly longer or shorter lead-in, so every line is off by
+# the same amount. Measure that against the vocals stem: near each line's
+# start, find where the voice comes in, and take the median gap.
+
+FRAME_SECONDS = 0.01
+ONSET_WINDOW = (-0.6, 1.2)    # look this far before / after each line start
+ONSET_HOLD_FRAMES = 5         # the voice must stay up for 50 ms
+VOICE_BELOW_LOUD_DB = 25.0    # "voice" = within 25 dB of loud singing
+MIN_ONSETS = 5                # need at least this many lines with a clear onset
+MIN_ONSET_SHARE = 0.5         # ... and at least half of all lines
+MAX_SPREAD = 0.6              # middle half of the gaps must fit in 0.6 s
+MIN_OFFSET = 0.1              # smaller than this: leave the lyrics alone
+MAX_OFFSET = 3.0              # larger than this: don't trust it
+
+
+def frame_levels_db(samples, sample_rate: int) -> "np.ndarray":
+    """RMS level in dB for consecutive 10 ms frames of a mono signal."""
+    import numpy as np
+
+    size = max(1, int(round(sample_rate * FRAME_SECONDS)))
+    usable = len(samples) // size * size
+    if usable == 0:
+        return np.full(1, -120.0)
+    frames = np.asarray(samples[:usable], dtype=np.float64).reshape(-1, size)
+    return 20 * np.log10(np.sqrt((frames ** 2).mean(axis=1)) + 1e-9)
+
+
+def voice_onsets(levels, starts: list[float]) -> list[float]:
+    """Gap (voice start minus line start) for each line with a clear onset."""
+    import numpy as np
+
+    levels = np.asarray(levels, dtype=np.float64)
+    threshold = np.percentile(levels, 90) - VOICE_BELOW_LOUD_DB
+    hold = ONSET_HOLD_FRAMES
+    gaps = []
+    for start in starts:
+        first = max(0, int(round((start + ONSET_WINDOW[0]) / FRAME_SECONDS)))
+        last = min(len(levels), int(round((start + ONSET_WINDOW[1]) / FRAME_SECONDS)))
+        window = levels[first:last]
+        for i in range(hold, len(window) - hold):
+            if (window[i:i + hold] > threshold).all() and (window[i - hold:i] <= threshold).any():
+                gaps.append((first + i) * FRAME_SECONDS - start)
+                break
+    return gaps
+
+
+def measure_offset(levels, segments: list[dict]) -> tuple[float | None, str]:
+    """(offset to add to every line, or None; a note saying why).
+
+    Returns an offset only when enough lines agree on it.
+    """
+    import numpy as np
+
+    starts = [float(s["start"]) for s in segments]
+    gaps = voice_onsets(levels, starts)
+    used = f"{len(gaps)} of {len(starts)} lines"
+    if len(gaps) < MIN_ONSETS or len(gaps) < MIN_ONSET_SHARE * len(starts):
+        return None, f"too few clear voice starts ({used})"
+    low, median, high = np.percentile(gaps, [25, 50, 75])
+    if high - low > MAX_SPREAD:
+        return None, f"lines disagree too much ({used}, middle half {low:+.2f} to {high:+.2f} s)"
+    offset = round(float(median) / 0.05) * 0.05
+    if abs(offset) < MIN_OFFSET:
+        return None, f"already in time ({offset:+.2f} s, {used})"
+    if abs(offset) > MAX_OFFSET:
+        return None, f"measured {offset:+.2f} s, too large to trust ({used})"
+    return offset, f"measured {offset:+.2f} s against the vocals ({used})"
+
+
+def measure_offset_from_audio(vocals: Path, segments: list[dict]) -> tuple[float | None, str]:
+    """measure_offset() on a vocals file, decoded to 16 kHz mono with ffmpeg."""
+    import numpy as np
+
+    sample_rate = 16000
+    try:
+        result = subprocess.run(
+            ["ffmpeg", "-v", "error", "-i", str(vocals), "-ac", "1", "-ar", str(sample_rate),
+             "-f", "f32le", "-"],
+            capture_output=True,
+        )
+    except OSError as err:
+        return None, f"could not read the vocals ({err})"
+    if result.returncode != 0 or not result.stdout:
+        return None, "could not read the vocals"
+    try:
+        samples = np.frombuffer(result.stdout, dtype=np.float32)
+    except (TypeError, ValueError):
+        return None, "could not read the vocals"
+    return measure_offset(frame_levels_db(samples, sample_rate), segments)

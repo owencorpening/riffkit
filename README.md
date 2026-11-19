@@ -135,10 +135,17 @@ Artist and title come from the file's tags, or give them yourself:
 .venv/bin/python riftkit.py "Song.opus" --artist "Some Band" --title "Some Song"
 ```
 
+Timed lyrics are made for one copy of a recording, and another upload of
+the same song can start a little earlier or later. So for lyrics from a
+`.lrc` file or LRCLIB, riffkit measures where the voice comes in on the
+vocals stem and shifts every line to match (it prints the amount, and
+leaves the lyrics alone when they already line up or the lines disagree).
+
 Other options: `--lyrics-from auto|lrc|lrclib|hear` picks one source
-(default `auto`, the order above), `--lyrics-offset 0.3` moves every line
-later by 0.3 seconds (negative is earlier), and `--no-lyrics` skips lyrics.
-riffkit prints which source it used.
+(default `auto`, the order above), `--lyrics-offset 0.3` sets the shift
+yourself instead (later by 0.3 seconds; negative is earlier; `0` turns the
+automatic shift off), and `--no-lyrics` skips lyrics. riffkit prints which
+source it used.
 
 **Lyrics are for your own use.** riffkit fetches lyrics only for the
 person running it, on their own machine, and never ships or publishes

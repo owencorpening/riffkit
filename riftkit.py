@@ -561,11 +561,18 @@ def add_lyrics(audio_file: Path, stems_dir: Path, rpp_path: Path, args) -> None:
             print("  Lyrics transcription failed; the project has no Lyrics track.")
             return
 
-    if args.lyrics_offset:
+    offset = args.lyrics_offset
+    if offset is None and segments:
+        # Looked-up lyrics: measure how far off this copy of the song is.
+        vocals = reaper_project.match_stem_files(stems_dir).get("Vocals")
+        if vocals is not None:
+            offset, why = lyrics_source.measure_offset_from_audio(vocals, segments)
+            print(f"  Lyrics offset: {why}" + ("; applied" if offset else "; none applied"))
+    if offset:
         doc = json.loads(lyrics_json.read_text(encoding="utf-8"))
-        doc["segments"] = lyrics_source.shift_segments(doc.get("segments") or [], args.lyrics_offset)
+        doc["segments"] = lyrics_source.shift_segments(doc.get("segments") or [], offset)
         lyrics_json.write_text(json.dumps(doc, ensure_ascii=False, indent=2), encoding="utf-8")
-        print(f"  Lyrics shifted by {args.lyrics_offset:+g} s")
+        print(f"  Lyrics shifted by {offset:+g} s")
 
     reaper_project.write_reaper_project(
         rpp_path, stems_dir, original=audio_file,
@@ -598,8 +605,10 @@ def main():
     parser.add_argument(
         "--lyrics-offset",
         type=float,
-        default=0.0,
-        help="Shift every lyrics line by this many seconds (negative = earlier; default 0)",
+        default=None,
+        help="Shift every lyrics line by this many seconds (negative = earlier). "
+             "Default: for looked-up lyrics, measured against the vocals; "
+             "0 turns that off",
     )
     parser.add_argument(
         "--stem-model",
