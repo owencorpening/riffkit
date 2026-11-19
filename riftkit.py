@@ -606,6 +606,7 @@ def main():
         "--lyrics-offset",
         type=float,
         default=None,
+        metavar="SECONDS",
         help="Shift every lyrics line by this many seconds (negative = earlier). "
              "Default: for looked-up lyrics, measured against the vocals; "
              "0 turns that off",
