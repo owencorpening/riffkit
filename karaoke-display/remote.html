@@ -132,7 +132,7 @@
 <main>
   <div id="status">
     <span id="pos">0:00</span>
-    <span id="rate">100%</span>
+    <span id="rate">Speed 100%</span>
     <span id="dot" title="connection to REAPER"></span>
     <span id="loop-status">No loop</span>
   </div>
@@ -145,7 +145,7 @@
     <h2>Speed</h2>
     <div class="row">
       <button id="slower">Slower</button>
-      <button id="normal">100%</button>
+      <button id="normal">Reset</button>
       <button id="faster">Faster</button>
     </div>
   </section>
@@ -184,7 +184,7 @@
 
 <script>
 /* Runs first, so it also catches errors in the scripts below. */
-var PAGE_VERSION = "remote 4 (2026-11-19, diagnostics)";
+var PAGE_VERSION = "remote 5 (2026-11-19, Reset button)";
 var PAGE_LOADED = new Date();
 function diagTime(d) { return d.toTimeString().slice(0, 8); }
 document.getElementById("diag-version").textContent =
@@ -495,7 +495,7 @@ function renderMutes() {
 function render() {
   $("dot").className = state.connected ? "ok" : "";
   $("pos").textContent = formatTime(state.pos);
-  $("rate").textContent = rateLabel(state.rate);
+  $("rate").textContent = `Speed ${rateLabel(state.rate)}`;
   $("play").textContent = state.playstate === 1 ? "Pause" : "Play";
 
   // A loop this page set only counts while REAPER's repeat is still on.
