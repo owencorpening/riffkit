@@ -75,6 +75,7 @@
     flex: none;
   }
   details[open] > summary::before { transform: rotate(90deg); }
+  summary .in-summary { margin-left: auto; min-height: 3rem; padding: 0.4rem 1.2rem; }
   summary h2 { color: var(--text); font-size: 1rem; }
 
   h2 { font-size: 0.85rem; font-weight: 600; color: var(--dim); text-transform: uppercase; letter-spacing: 0.08em; }
@@ -171,7 +172,11 @@
 
   <section>
     <details id="loop-box" open>
-      <summary><h2>Loop</h2></summary>
+      <summary>
+        <h2>Loop</h2>
+        <!-- In the heading row: a loop can always be stopped, folded or not. -->
+        <button id="stop-loop" class="in-summary">Stop loop</button>
+      </summary>
       <div class="row">
         <button id="mark-a">A</button>
         <button id="mark-b" disabled>B</button>
@@ -186,8 +191,6 @@
         </div>
       </div>
     </details>
-    <!-- Outside the collapsible part: a loop can always be stopped. -->
-    <button id="stop-loop" class="big">Stop loop</button>
   </section>
 
   <section>
@@ -208,7 +211,7 @@
 
 <script>
 /* Runs first, so it also catches errors in the scripts below. */
-var PAGE_VERSION = "remote 11 (2026-11-19, wider Start/End)";
+var PAGE_VERSION = "remote 12 (2026-11-19, Stop loop in heading)";
 var PAGE_LOADED = new Date();
 function diagTime(d) { return d.toTimeString().slice(0, 8); }
 document.getElementById("diag-version").textContent =
@@ -487,7 +490,8 @@ $("loop-line").onclick = () => {
 };
 $("line-more").onclick = () => { if (state.sel) setLineLoop(addLine(state.lines, state.sel)); };
 $("line-less").onclick = () => { if (state.sel) setLineLoop(removeLine(state.sel)); };
-$("stop-loop").onclick = stopLoop;
+// Inside the Loop heading: stop the loop without folding or unfolding it.
+$("stop-loop").onclick = (e) => { e.preventDefault(); e.stopPropagation(); stopLoop(); };
 
 function toggleMute(track) {
   track.muted = !track.muted;  // show it now; the next poll confirms
