@@ -127,12 +127,17 @@
       grid-template-columns: 1fr 1fr;
       align-items: start;
     }
-    #status { grid-column: 1 / -1; }
+    #transport, #status { grid-column: 1 / -1; }
   }
 </style>
 </head>
 <body>
 <main>
+  <div id="transport" class="row">
+    <button id="back" class="big">« 5 s</button>
+    <button id="play" class="big primary">Play</button>
+  </div>
+
   <div id="status">
     <span id="pos">0:00</span>
     <span id="rate">Speed 100%</span>
@@ -141,10 +146,6 @@
   </div>
 
   <section>
-    <div class="row">
-      <button id="back" class="big">« 5 s</button>
-      <button id="play" class="big primary">Play</button>
-    </div>
     <details id="speed-box" open>
       <summary><h2>Speed</h2></summary>
       <div class="row">
@@ -194,7 +195,7 @@
 
 <script>
 /* Runs first, so it also catches errors in the scripts below. */
-var PAGE_VERSION = "remote 8 (2026-11-19, Speed twisty)";
+var PAGE_VERSION = "remote 9 (2026-11-19, Play on top)";
 var PAGE_LOADED = new Date();
 function diagTime(d) { return d.toTimeString().slice(0, 8); }
 document.getElementById("diag-version").textContent =
