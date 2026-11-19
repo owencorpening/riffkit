@@ -51,6 +51,27 @@
   #loop-status.on { color: var(--accent); }
 
   section { display: flex; flex-direction: column; gap: 0.5rem; }
+  /* Collapsible loop controls: tap the heading to fold them away. */
+  details { display: flex; flex-direction: column; }
+  details[open] > :not(summary) { margin-top: 0.5rem; }
+  #line-controls { display: flex; flex-direction: column; gap: 0.5rem; }
+  summary {
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 2.4rem;
+    cursor: pointer;
+  }
+  summary::-webkit-details-marker { display: none; }
+  summary::after {
+    content: "▸";
+    color: var(--dim);
+    font-size: 1rem;
+    transition: transform 120ms;
+  }
+  details[open] > summary::after { transform: rotate(90deg); }
+
   h2 { font-size: 0.85rem; font-weight: 600; color: var(--dim); text-transform: uppercase; letter-spacing: 0.08em; }
   .row { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 0.5rem; }
 
@@ -113,20 +134,23 @@
   </section>
 
   <section>
-    <h2>Loop</h2>
-    <div class="row">
-      <button id="mark-a">A</button>
-      <button id="mark-b" disabled>B</button>
-    </div>
-    <div id="line-controls" class="hidden">
+    <details id="loop-box" open>
+      <summary><h2>Loop</h2></summary>
       <div class="row">
-        <button id="loop-line">Loop this line</button>
+        <button id="mark-a">A</button>
+        <button id="mark-b" disabled>B</button>
       </div>
-      <div class="row" style="margin-top:0.5rem">
-        <button id="line-less" disabled>− line</button>
-        <button id="line-more" disabled>+ line</button>
+      <div id="line-controls" class="hidden">
+        <div class="row">
+          <button id="loop-line">Loop this line</button>
+        </div>
+        <div class="row">
+          <button id="line-less" disabled>− line</button>
+          <button id="line-more" disabled>+ line</button>
+        </div>
       </div>
-    </div>
+    </details>
+    <!-- Outside the collapsible part: a loop can always be stopped. -->
     <button id="stop-loop" class="big">Stop loop</button>
   </section>
 
@@ -429,6 +453,16 @@ function render() {
 }
 
 /* ---------------- start ---------------- */
+
+// Remember whether the loop controls are open, on this phone only.
+const loopBox = $("loop-box");
+try {
+  const saved = localStorage.getItem("riffkit-remote-loop-open");
+  if (saved !== null) loopBox.open = saved === "1";
+} catch {}
+loopBox.addEventListener("toggle", () => {
+  try { localStorage.setItem("riffkit-remote-loop-open", loopBox.open ? "1" : "0"); } catch {}
+});
 
 const src = new URLSearchParams(location.search).get("src");
 if (src) {
