@@ -207,3 +207,80 @@ def test_main_lyrics_from_hear_never_looks_anything_up(tmp_path, monkeypatch):
 
     transcribe.assert_called_once()
     assert calls == []
+
+
+# --- Automatic offset --------------------------------------------------------
+
+np = pytest.importorskip("numpy")
+
+
+def _levels(voice_starts, length=60.0, line_seconds=1.5):
+    """Synthetic 10 ms frame levels: quiet, with -20 dB singing at each start."""
+    levels = np.full(int(length / ls.FRAME_SECONDS), -80.0)
+    for t in voice_starts:
+        a = int(t / ls.FRAME_SECONDS)
+        levels[a:a + int(line_seconds / ls.FRAME_SECONDS)] = -20.0
+    return levels
+
+
+def _segments(starts):
+    return [{"start": t, "end": t + 2.0, "text": " la"} for t in starts]
+
+
+STARTS = [5.0, 10.0, 15.0, 20.0, 25.0, 30.0, 35.0, 40.0]
+
+
+def test_offset_is_measured_when_every_line_is_early_by_the_same_amount():
+    offset, note = ls.measure_offset(_levels([t + 0.55 for t in STARTS]), _segments(STARTS))
+    assert offset == pytest.approx(0.55)
+    assert "8 of 8 lines" in note
+
+
+def test_offset_can_be_negative_when_the_lyrics_are_late():
+    offset, _ = ls.measure_offset(_levels([t - 0.4 for t in STARTS]), _segments(STARTS))
+    assert offset == pytest.approx(-0.4)
+
+
+def test_lyrics_already_in_time_are_left_alone():
+    offset, note = ls.measure_offset(_levels([t + 0.03 for t in STARTS]), _segments(STARTS))
+    assert offset is None and "already in time" in note
+
+
+def test_no_offset_when_lines_disagree():
+    jitter = [0.0, 1.0, -0.5, 0.9, -0.4, 1.1, 0.1, -0.3]
+    offset, note = ls.measure_offset(_levels([t + j for t, j in zip(STARTS, jitter)]), _segments(STARTS))
+    assert offset is None and "disagree" in note
+
+
+def test_no_offset_without_enough_clear_voice_starts():
+    offset, note = ls.measure_offset(_levels(STARTS[:3]), _segments(STARTS))
+    assert offset is None and "too few" in note
+
+
+def _main_with_lrc(tmp_path, *extra, measured=(0.55, "measured +0.55 s against the vocals (2 of 2 lines)")):
+    song, stems_dir = _song_with_stems(tmp_path)
+    (tmp_path / "Teapot Song.lrc").write_text(LRC, encoding="utf-8")
+    with patch("lyrics_source.measure_offset_from_audio", return_value=measured) as measure:
+        _run_main(song, tmp_path, *extra)
+    doc = json.loads((stems_dir / "lyrics.json").read_text(encoding="utf-8"))
+    return measure, [round(s["start"], 2) for s in doc["segments"]]
+
+
+def test_main_applies_the_measured_offset_to_looked_up_lyrics(tmp_path, capsys):
+    measure, starts = _main_with_lrc(tmp_path)
+    measure.assert_called_once()
+    assert starts == [5.65, 10.05]
+    assert "Lyrics offset: measured +0.55 s" in capsys.readouterr().out
+
+
+def test_main_explicit_offset_replaces_the_measurement(tmp_path):
+    measure, starts = _main_with_lrc(tmp_path, "--lyrics-offset", "0")
+    measure.assert_not_called()
+    assert starts == [5.1, 9.5]
+
+
+def test_main_does_not_measure_heard_lyrics(tmp_path):
+    song, _ = _song_with_stems(tmp_path)
+    with patch("lyrics_source.measure_offset_from_audio") as measure:
+        _run_main(song, tmp_path, "--lyrics-from", "hear")
+    measure.assert_not_called()
