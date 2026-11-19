@@ -11,6 +11,7 @@ These are intentionally practical:
 
 ## Procedures
 
+- [Get a Song File](get-a-song.md)
 - [Stem Separation](stem-separation.md)
 - [Local Whisper Transcription](local-transcription.md)
 - [REAPER Lyrics Import](reaper-lyrics-import.md)
