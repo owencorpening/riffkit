@@ -41,9 +41,11 @@ concert ──► split into songs ──► each song ──► stems ──►
    sections, and other instruments. For a separate
    guitar stem, use `--stem-model htdemucs_6s`, which also splits out
    guitar and piano, at some cost in quality.
-2. **Lyrics:** Whisper transcribes the vocals stem; the transcript is
-   cleaned up (long lines split, invented text over silent stretches
-   dropped, each line moved to where the voice comes in).
+2. **Lyrics:** looked up when possible, heard otherwise (see
+   [Where lyrics come from](#where-lyrics-come-from)). Heard lyrics come
+   from Whisper transcribing the vocals stem; the transcript is cleaned
+   up (long lines split, invented text over silent stretches dropped,
+   each line moved to where the voice comes in).
 3. **REAPER project:** one `.RPP` **for each song**, with Vocals, Drums,
    Bass and Other on their own tracks, the original mix on a muted track,
    and the lyrics on a Lyrics track. Open it and play.
@@ -112,6 +114,35 @@ re-cut without detection:
 
 Then run each song file through the song command above to get one
 REAPER project per song.
+
+### Where lyrics come from
+
+riffkit takes the first of these that works:
+
+1. **A `.lrc` file next to the song** with the same name, such as
+   `My Song.lrc` beside `My Song.opus`. Use this for your own timed lyrics.
+2. **[LRCLIB](https://lrclib.net)**, a free, community-built library of
+   timed lyrics. riffkit makes one lookup by artist, title and the song's
+   length, and uses the result only if it has timed lyrics and its length
+   is within 2 seconds of your file's. The result is saved as a `.lrc`
+   next to the song, so it is never looked up twice.
+3. **Hearing them:** Whisper transcribes the vocals stem. This works with
+   any song but gets many words wrong, especially on live recordings.
+
+Artist and title come from the file's tags, or give them yourself:
+
+```bash
+.venv/bin/python riftkit.py "Song.opus" --artist "Some Band" --title "Some Song"
+```
+
+Other options: `--lyrics-from auto|lrc|lrclib|hear` picks one source
+(default `auto`, the order above), `--lyrics-offset 0.3` moves every line
+later by 0.3 seconds (negative is earlier), and `--no-lyrics` skips lyrics.
+riffkit prints which source it used.
+
+**Lyrics are for your own use.** riffkit fetches lyrics only for the
+person running it, on their own machine, and never ships or publishes
+them. Thanks to LRCLIB and its contributors for the timed lyrics.
 
 ### Using riffkit with an AI assistant
 

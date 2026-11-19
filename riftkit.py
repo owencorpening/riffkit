@@ -14,7 +14,8 @@ Usage:
 Steps:
     1. Separate stems with Demucs htdemucs_ft (vocals, drums, bass, other)
     2. Write a REAPER project with the stems and the original on tracks
-    3. Transcribe vocals with Whisper (medium) and clean the transcript
+    3. Lyrics: a .lrc file next to the song, else LRCLIB, else transcribe
+       the vocals with Whisper (medium) and clean the transcript
     4. Insert lyrics into REAPER project on a Lyrics track
 
 Requires:
@@ -520,6 +521,59 @@ def split_concert_by_boundaries(audio_file: Path, output_dir: Path, boundaries_f
     return split_concert_into_songs(audio_file, output_dir, song_segments=segments)
 
 
+def add_lyrics(audio_file: Path, stems_dir: Path, rpp_path: Path, args) -> None:
+    """Find or hear the lyrics, write lyrics.json and add a Lyrics track."""
+    import lyrics_source
+    import reaper_project
+
+    lyrics_json = stems_dir / "lyrics.json"
+    segments, note = None, ""
+    if args.lyrics_from != "hear":
+        artist, title = args.artist, args.title
+        if not (artist and title):
+            tag_artist, tag_title = lyrics_source.read_tags(audio_file)
+            artist, title = artist or tag_artist, title or tag_title
+        try:
+            duration = probe_duration(audio_file)
+        except RuntimeError:
+            duration = None
+        segments, note = lyrics_source.find_lyrics(
+            audio_file, args.lyrics_from, artist=artist, title=title, duration=duration
+        )
+
+    if segments:
+        print(f"  Lyrics source: {note}")
+        lyrics_json.write_text(json.dumps(
+            {"schema": "riffkit-transcript-v1", "source": note, "segments": segments},
+            ensure_ascii=False, indent=2), encoding="utf-8")
+    elif args.lyrics_from in ("lrc", "lrclib"):
+        print(f"  Lyrics: {note}; the project has no Lyrics track.")
+        return
+    else:
+        if note:
+            print(f"  {note}")
+        print("  Lyrics source: heard (transcribing the vocals stem)")
+        vocals = reaper_project.match_stem_files(stems_dir).get("Vocals")
+        if vocals is None:
+            print("  No vocals stem found; skipping lyrics.")
+            return
+        if not transcribe_vocals(vocals, lyrics_json):
+            print("  Lyrics transcription failed; the project has no Lyrics track.")
+            return
+
+    if args.lyrics_offset:
+        doc = json.loads(lyrics_json.read_text(encoding="utf-8"))
+        doc["segments"] = lyrics_source.shift_segments(doc.get("segments") or [], args.lyrics_offset)
+        lyrics_json.write_text(json.dumps(doc, ensure_ascii=False, indent=2), encoding="utf-8")
+        print(f"  Lyrics shifted by {args.lyrics_offset:+g} s")
+
+    reaper_project.write_reaper_project(
+        rpp_path, stems_dir, original=audio_file,
+        lyrics=reaper_project.load_lyrics(lyrics_json),
+    )
+    print(f"  Lyrics  -> {lyrics_json} (on the Lyrics track)")
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Process an audio file into a practice-ready REAPER project"
@@ -529,7 +583,23 @@ def main():
         "--output", help="Output directory (default: ./projects)", default="./projects"
     )
     parser.add_argument(
-        "--no-lyrics", action="store_true", help="Skip lyrics transcription"
+        "--no-lyrics", action="store_true", help="Skip lyrics entirely"
+    )
+    parser.add_argument(
+        "--lyrics-from",
+        choices=["auto", "lrc", "lrclib", "hear"],
+        default="auto",
+        help="Where lyrics come from: auto (a .lrc next to the song, else LRCLIB, "
+             "else hear them), lrc, lrclib, or hear (transcribe the vocals). "
+             "Default: auto",
+    )
+    parser.add_argument("--artist", help="Artist for the LRCLIB lookup (default: the file's tags)")
+    parser.add_argument("--title", help="Song title for the LRCLIB lookup (default: the file's tags)")
+    parser.add_argument(
+        "--lyrics-offset",
+        type=float,
+        default=0.0,
+        help="Shift every lyrics line by this many seconds (negative = earlier; default 0)",
     )
     parser.add_argument(
         "--stem-model",
@@ -629,20 +699,10 @@ def main():
     reaper_project.write_reaper_project(rpp_path, stems_dir, original=audio_file)
     print(f"  Project -> {rpp_path}")
 
-    # Step 3: Transcribe the vocals stem and put the lyrics on a Lyrics track
+    # Step 3: Lyrics (.lrc next to the song, LRCLIB, or heard from the vocals)
+    #         on a Lyrics track
     if not args.no_lyrics:
-        vocals = reaper_project.match_stem_files(stems_dir).get("Vocals")
-        lyrics_json = stems_dir / "lyrics.json"
-        if vocals is None:
-            print("  No vocals stem found; skipping lyrics.")
-        elif transcribe_vocals(vocals, lyrics_json):
-            reaper_project.write_reaper_project(
-                rpp_path, stems_dir, original=audio_file,
-                lyrics=reaper_project.load_lyrics(lyrics_json),
-            )
-            print(f"  Lyrics  -> {lyrics_json} (on the Lyrics track)")
-        else:
-            print("  Lyrics transcription failed; the project has no Lyrics track.")
+        add_lyrics(audio_file, stems_dir, rpp_path, args)
 
     print(f"""
 Done!
