@@ -367,10 +367,26 @@ function stopLoop() {
 
 /* ---------------- controls ---------------- */
 
+// The speed this page set lives for the life of the browser tab, so a
+// reload (phones reload a tab when you come back to it) or a reconnect
+// keeps it instead of resetting REAPER to 100%.
+const RATE_KEY = "riffkit-remote-rate";
+
 function setRate(rate) {
   state.rate = rate;
-  send([`OSC/playrate/raw:${rate}`]);
+  try { sessionStorage.setItem(RATE_KEY, String(rate)); } catch {}
   render();
+  send([`OSC/playrate/raw:${rate}`]);
+}
+
+// The speed this tab set before a reload, or null on the first load.
+function savedRate() {
+  try {
+    const r = parseFloat(sessionStorage.getItem(RATE_KEY));
+    return r >= RATE_MIN && r <= RATE_MAX ? r : null;
+  } catch {
+    return null;
+  }
 }
 
 $("play").onclick = () => send([state.playstate === 1 ? PAUSE : PLAY]).then(poll);
@@ -480,7 +496,11 @@ if (src) {
     .catch(() => {});
 }
 
-setRate(1);  // the speed shown is always the speed this page set
+// First load in this tab: set 100%. After a reload: show the speed this
+// tab already set, and send nothing.
+const kept = savedRate();
+if (kept === null) setRate(1);
+else { state.rate = kept; render(); }
 poll();
 setInterval(poll, POLL_MS);
 </script>
