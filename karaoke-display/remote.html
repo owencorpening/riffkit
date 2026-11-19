@@ -78,6 +78,8 @@
   summary h2 { color: var(--text); font-size: 1rem; }
 
   h2 { font-size: 0.85rem; font-weight: 600; color: var(--dim); text-transform: uppercase; letter-spacing: 0.08em; }
+  #transport { display: flex; flex-direction: column; gap: 0.5rem; }
+  .row.wide-right { grid-auto-columns: 1fr 2fr; }
   .row { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 0.5rem; }
 
   button {
@@ -133,9 +135,17 @@
 </head>
 <body>
 <main>
-  <div id="transport" class="row">
-    <button id="back" class="big">« 5 s</button>
-    <button id="play" class="big primary">Play</button>
+  <div id="transport">
+    <div class="row">
+      <button id="to-start">|◀ Start</button>
+      <button id="back">« 5 s</button>
+      <button id="forward">5 s »</button>
+      <button id="to-end">End ▶|</button>
+    </div>
+    <div class="row wide-right">
+      <button id="stop" class="big">■ Stop</button>
+      <button id="play" class="big primary">Play</button>
+    </div>
   </div>
 
   <div id="status">
@@ -195,7 +205,7 @@
 
 <script>
 /* Runs first, so it also catches errors in the scripts below. */
-var PAGE_VERSION = "remote 9 (2026-11-19, Play on top)";
+var PAGE_VERSION = "remote 10 (2026-11-19, full transport)";
 var PAGE_LOADED = new Date();
 function diagTime(d) { return d.toTimeString().slice(0, 8); }
 document.getElementById("diag-version").textContent =
@@ -297,7 +307,8 @@ function removeLine(sel) {
  * own pages use (see main.js in REAPER's reaper_www_root):
  *
  *   TRANSPORT, GET/REPEAT, NTRACK, TRACK      read state
- *   1007 play, 1008 pause                     REAPER actions
+ *   1007 play, 1008 pause, 1016 stop          REAPER actions
+ *   40042 / 40043                             go to start / end of project
  *   SET/POS/<s>                               move the play position
  *   SET/REPEAT/<0|1>                          repeat off / on
  *   SET/TRACK/<i>/MUTE/-1                     toggle one track's mute
@@ -318,6 +329,9 @@ function removeLine(sel) {
 const POLL_MS = 250;
 const PLAY = 1007;
 const PAUSE = 1008;
+const STOP = 1016;
+const TO_START = 40042;
+const TO_END = 40043;
 const TIMESEL_START = 40625;
 const TIMESEL_END = 40626;
 const CLEAR_LOOP = 40020;
@@ -448,6 +462,10 @@ function savedRate() {
 
 $("play").onclick = () => send([state.playstate === 1 ? PAUSE : PLAY]).then(poll);
 $("back").onclick = () => send([`SET/POS/${Math.max(0, state.pos - 5)}`]).then(poll);
+$("forward").onclick = () => send([`SET/POS/${state.pos + 5}`]).then(poll);
+$("stop").onclick = () => send([STOP]).then(poll);
+$("to-start").onclick = () => send([TO_START]).then(poll);
+$("to-end").onclick = () => send([TO_END]).then(poll);
 $("slower").onclick = () => setRate(stepRate(state.rate, -1));
 $("faster").onclick = () => setRate(stepRate(state.rate, +1));
 $("normal").onclick = () => setRate(1);
