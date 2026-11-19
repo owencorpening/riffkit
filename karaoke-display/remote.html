@@ -107,14 +107,17 @@
   /* Diagnostics footer: version, page load time, last command, errors. */
   #diag {
     grid-column: 1 / -1;
-    font: 0.8rem/1.5 ui-monospace, monospace;
-    color: var(--dim);
     border-top: 1px solid var(--button);
     padding-top: 0.6rem;
-    word-break: break-all;
+  }
+  #diag-body {
+    font-size: 1rem;
+    line-height: 1.6;
+    color: var(--chip);
+    word-break: break-word;
     user-select: text;
   }
-  #diag .err { color: var(--muted); }
+  #diag-body .err { color: var(--muted); font-weight: 600; }
 
   /* Landscape: two columns side by side, still thumb-sized. */
   @media (orientation: landscape) and (min-width: 600px) {
@@ -175,16 +178,19 @@
     <h2>Mute</h2>
     <div id="mutes"></div>
   </section>
-  <div id="diag">
-    <div id="diag-version"></div>
-    <div id="diag-sent">Last sent: nothing yet</div>
-    <div id="diag-error" class="err"></div>
-  </div>
+  <details id="diag">
+    <summary><h2>Details</h2></summary>
+    <div id="diag-body">
+      <div id="diag-version"></div>
+      <div id="diag-sent">Last sent: nothing yet</div>
+      <div id="diag-error" class="err"></div>
+    </div>
+  </details>
 </main>
 
 <script>
 /* Runs first, so it also catches errors in the scripts below. */
-var PAGE_VERSION = "remote 5 (2026-11-19, Reset button)";
+var PAGE_VERSION = "remote 6 (2026-11-19, Details)";
 var PAGE_LOADED = new Date();
 function diagTime(d) { return d.toTimeString().slice(0, 8); }
 document.getElementById("diag-version").textContent =
@@ -192,6 +198,7 @@ document.getElementById("diag-version").textContent =
 function diagError(message) {
   var box = document.getElementById("diag-error");
   if (!box.textContent) box.textContent = "Error: " + message;
+  document.getElementById("diag").open = true;  // never hide an error
 }
 window.addEventListener("error", function (e) {
   diagError((e.message || "unknown") + " (line " + (e.lineno || "?") + ")");
