@@ -14,7 +14,7 @@ people's music is published.
 
 ```bash
 yt-dlp -f bestaudio -x --no-playlist \
-  -o "~/Music/riffkit-sources/%(title)s.%(ext)s" "YOUTUBE-URL"
+  -o "$HOME/Music/riffkit-sources/%(title)s.%(ext)s" "YOUTUBE-URL"
 ```
 
 - `-f bestaudio` picks the best audio-only stream.
